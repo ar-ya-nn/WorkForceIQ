@@ -1,0 +1,14 @@
+# Python / Virtual Environment
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Local Config & Database Exports (Don't commit massive seed files or passwords)
+*.log
+.env
+
+# IDE / OS Files
+.vscode/
+.idea/
+.DS_Store
