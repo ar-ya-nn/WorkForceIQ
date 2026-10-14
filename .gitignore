@@ -1,14 +1,22 @@
-# Python / Virtual Environment
+# Python / virtual environment
 venv/
 .venv/
 __pycache__/
 *.pyc
 
-# Local Config & Database Exports (Don't commit massive seed files or passwords)
-*.log
+# Secrets and logs
 .env
+*.log
 
-# IDE / OS Files
+# Generated / downloaded data (regenerate with database/load_data.py)
+seed_data.sql
+*.csv
+
+# IDE / OS files
 .vscode/
 .idea/
 .DS_Store
+
+# Frontend
+node_modules/
+frontend/dist/

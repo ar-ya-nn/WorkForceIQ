@@ -1,0 +1,105 @@
+import { useEffect, useState } from "react";
+import { api, fmt } from "../api.js";
+import { Badge, Drawer, ErrorBox, Loading } from "./ui.jsx";
+
+const SCALE = { 1: "Low", 2: "Medium", 3: "High", 4: "Very high" };
+
+/** Side panel with everything about one employee: profile, risk, leave balance, reviews. */
+export default function EmployeeDrawer({ userId, onClose }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    setData(null);
+    setError(null);
+    Promise.allSettled([
+      api.get(`/users/${userId}`),
+      api.get(`/predictions/${userId}`),
+      api.get(`/leave/balance/${userId}`),
+      api.get(`/users/${userId}/reviews`),
+    ]).then(([details, risk, balance, reviews]) => {
+      if (details.status === "rejected") {
+        setError(details.reason.message);
+        return;
+      }
+      setData({
+        details: details.value,
+        risk: risk.status === "fulfilled" ? risk.value : null,
+        balance: balance.status === "fulfilled" ? balance.value : [],
+        reviews: reviews.status === "fulfilled" ? reviews.value : [],
+      });
+    });
+  }, [userId]);
+
+  const d = data?.details;
+
+  return (
+    <Drawer open={Boolean(userId)} onClose={onClose} title={d ? d.full_name : "Employee"}>
+      {error && <ErrorBox message={error} />}
+      {!data && !error && <Loading />}
+      {d && (
+        <>
+          <div className="drawer-tags">
+            <Badge value={d.status} />
+            {data.risk && <Badge value={data.risk.risk_level} />}
+            <span className="muted small">{d.role_name} · {d.department_name ?? "No department"}</span>
+          </div>
+
+          {data.risk && (
+            <div className="risk-meter">
+              <div className="risk-meter-label">
+                <span>Attrition risk</span>
+                <strong>{(Number(data.risk.risk_score) * 100).toFixed(0)}%</strong>
+              </div>
+              <div className="bar"><div className={`bar-fill risk-${data.risk.risk_level}`} style={{ width: `${Number(data.risk.risk_score) * 100}%` }} /></div>
+            </div>
+          )}
+
+          <h4>Profile</h4>
+          <dl className="details">
+            <dt>Email</dt><dd>{d.email}</dd>
+            <dt>Job role</dt><dd>{d.job_role ?? "—"}</dd>
+            <dt>Job level</dt><dd>{d.job_level ?? "—"}</dd>
+            <dt>Age / gender</dt><dd>{d.age ?? "—"} / {d.gender ?? "—"}</dd>
+            <dt>Joined</dt><dd>{fmt.date(d.joining_date)} ({d.years_at_company ?? 0} yrs)</dd>
+            <dt>Monthly income</dt><dd>{fmt.money(d.monthly_income)}</dd>
+            <dt>Overtime</dt><dd>{d.overtime === null ? "—" : d.overtime ? "Yes" : "No"}</dd>
+            <dt>Job satisfaction</dt><dd>{SCALE[d.job_satisfaction] ?? "—"}</dd>
+            <dt>Work-life balance</dt><dd>{SCALE[d.work_life_balance] ?? "—"}</dd>
+            <dt>Since last promotion</dt><dd>{d.years_since_last_promotion ?? "—"} yrs</dd>
+          </dl>
+
+          {data.balance.length > 0 && (
+            <>
+              <h4>Leave balance (this year)</h4>
+              <table className="table compact">
+                <thead><tr><th>Type</th><th>Taken</th><th>Pending</th><th>Left</th></tr></thead>
+                <tbody>
+                  {data.balance.map((b) => (
+                    <tr key={b.type_name}>
+                      <td>{b.type_name}</td><td>{b.days_taken}</td><td>{b.days_pending}</td><td>{b.days_remaining} / {b.max_days}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {data.reviews.length > 0 && (
+            <>
+              <h4>Performance reviews</h4>
+              {data.reviews.map((r) => (
+                <div key={r.review_id} className="review">
+                  <div><strong>{"★".repeat(r.rating)}</strong><span className="muted">{"★".repeat(5 - r.rating)}</span></div>
+                  <p>{r.feedback}</p>
+                  <span className="muted small">{fmt.date(r.review_date)} · reviewer #{r.reviewer_id}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </>
+      )}
+    </Drawer>
+  );
+}

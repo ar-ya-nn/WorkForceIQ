@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+python-dotenv
+faker
+bcrypt
+email-validator
+scikit-learn
+pandas
+joblib
