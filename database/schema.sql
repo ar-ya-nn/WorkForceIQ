@@ -335,7 +335,7 @@ SELECT p.job_role,
 FROM employee_profiles p
 GROUP BY p.job_role;
 
--- Attendance over the last 30 days for each active employee.
+-- Attendance over the last 30 days of recorded data for each active employee.
 CREATE VIEW v_attendance_summary AS
 SELECT u.user_id,
        u.first_name || ' ' || u.last_name                    AS full_name,
@@ -349,7 +349,9 @@ SELECT u.user_id,
              / NULLIF(COUNT(a.attendance_id), 0), 2)          AS attendance_rate_pct
 FROM users u
 LEFT JOIN attendance a
-       ON a.user_id = u.user_id AND a.date >= CURRENT_DATE - 30
+       ON a.user_id = u.user_id
+      AND a.date BETWEEN (SELECT MAX(date) FROM attendance WHERE status <> 'ON_LEAVE') - 30          -- last 30 days of recorded data
+                     AND (SELECT MAX(date) FROM attendance WHERE status <> 'ON_LEAVE')
 WHERE u.status = 'ACTIVE'
 GROUP BY u.user_id, u.first_name, u.last_name, u.department_id;
 

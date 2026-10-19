@@ -1,6 +1,6 @@
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fmt, useApi } from "../api.js";
-import { Card, ErrorBox, Loading, PageHeader, StatCard } from "../components/ui.jsx";
+import { Card, ChartGradients, ErrorBox, Loading, PageHeader, Reveal, StatCard } from "../components/ui.jsx";
 import { COLORS, axisProps, tooltipProps } from "./chartTheme.js";
 
 const pretty = (name) => name.replace(/_/g, " ");
@@ -8,7 +8,7 @@ const pretty = (name) => name.replace(/_/g, " ");
 export default function Model() {
   const info = useApi("/predictions/model-info");
 
-  if (info.loading) return <Loading />;
+  if (info.loading) return <Loading rows={6} />;
   if (info.error) return <ErrorBox message={info.error} />;
 
   const m = info.data;
@@ -20,25 +20,26 @@ export default function Model() {
 
   return (
     <>
-      <PageHeader title="Attrition Model" subtitle={`${m.model_name} · trained ${fmt.datetime(m.trained_at)} on ${m.training_rows} employees`} />
+      <PageHeader eyebrow="Machine learning" title="Attrition Model" subtitle={`${m.model_name} · trained ${fmt.datetime(m.trained_at)} on ${m.training_rows} employees`} />
 
-      <div className="grid stats">
-        <StatCard label="ROC-AUC" value={m.metrics.roc_auc} decimals={3} tone="violet" />
-        <StatCard label="Recall" value={m.metrics.recall * 100} suffix="%" decimals={1} tone="green" />
-        <StatCard label="Precision" value={m.metrics.precision * 100} suffix="%" decimals={1} tone="amber" />
+      <Reveal delay={0.1} className="grid stats">
+        <StatCard label="ROC-AUC" value={m.metrics.roc_auc} decimals={3} tone="violet" hint="0.5 = guessing, 1.0 = perfect" />
+        <StatCard label="Recall" value={m.metrics.recall * 100} suffix="%" decimals={1} tone="green" hint="of leavers caught" />
+        <StatCard label="Precision" value={m.metrics.precision * 100} suffix="%" decimals={1} tone="amber" hint="of flags correct" />
         <StatCard label="F1 score" value={m.metrics.f1} decimals={3} tone="cyan" />
-      </div>
+      </Reveal>
 
-      <div className="grid two">
+      <Reveal delay={0.2} className="grid two">
         <Card title="Top risk factors" subtitle="Red pushes risk up, green pulls it down">
           <ResponsiveContainer width="100%" height={340}>
             <BarChart layout="vertical" data={factors} margin={{ left: 60 }}>
+              <ChartGradients />
               <CartesianGrid stroke={COLORS.grid} horizontal={false} />
               <XAxis type="number" {...axisProps} />
               <YAxis type="category" dataKey="name" {...axisProps} width={190} />
               <Tooltip {...tooltipProps} formatter={(v) => [Number(v).toFixed(3), "Weight"]} />
-              <Bar dataKey="value" barSize={14} radius={4}>
-                {factors.map((f) => <Cell key={f.name} fill={f.value >= 0 ? COLORS.red : COLORS.green} />)}
+              <Bar dataKey="value" barSize={16} radius={6} animationDuration={1100}>
+                {factors.map((f) => <Cell key={f.name} fill={f.value >= 0 ? "url(#grad-h-red)" : "url(#grad-h-green)"} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -73,7 +74,7 @@ export default function Model() {
             </table>
           </Card>
         </div>
-      </div>
+      </Reveal>
     </>
   );
 }

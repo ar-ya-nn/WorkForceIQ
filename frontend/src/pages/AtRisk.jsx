@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { fmt, useApi } from "../api.js";
 import EmployeeDrawer from "../components/EmployeeDrawer.jsx";
-import { Badge, Card, ErrorBox, Loading, PageHeader, Pagination } from "../components/ui.jsx";
+import { Badge, Card, ErrorBox, Loading, PageHeader, Pagination, Person, Reveal } from "../components/ui.jsx";
 
 const LIMIT = 15;
 
@@ -22,7 +22,7 @@ export default function AtRisk() {
 
   return (
     <>
-      <PageHeader title="Attrition Risk" subtitle="Active employees ranked by predicted risk of leaving">
+      <PageHeader eyebrow="Machine learning" title="Attrition Risk" subtitle="Active employees ranked by their predicted risk of leaving">
         <select value={riskLevel} onChange={changeFilter(setRiskLevel)}>
           <option value="">All risk levels</option>
           <option value="HIGH">High risk</option>
@@ -36,7 +36,7 @@ export default function AtRisk() {
       </PageHeader>
 
       {summary.data && (
-        <div className="grid three">
+        <Reveal delay={0.1} className="grid three">
           {summary.data.by_department.map((d) => (
             <Card key={d.department_name} title={d.department_name}>
               <div className="risk-split">
@@ -47,11 +47,12 @@ export default function AtRisk() {
               <p className="muted small">Average risk {(Number(d.avg_risk_score) * 100).toFixed(1)}% across {d.employees} employees</p>
             </Card>
           ))}
-        </div>
+        </Reveal>
       )}
 
+      <Reveal delay={0.2}>
       <Card>
-        {list.loading ? <Loading /> : list.error ? <ErrorBox message={list.error} /> : (
+        {list.loading ? <Loading rows={8} /> : list.error ? <ErrorBox message={list.error} /> : (
           <>
             <div className="table-wrap">
               <table className="table clickable">
@@ -61,7 +62,7 @@ export default function AtRisk() {
                 <tbody>
                   {list.data.items.map((e) => (
                     <tr key={e.user_id} onClick={() => setSelected(e.user_id)}>
-                      <td><strong>{e.full_name}</strong><div className="muted small">{e.email}</div></td>
+                      <td><Person name={e.full_name} sub={e.email} /></td>
                       <td>{e.department_name}</td>
                       <td>{e.job_role}</td>
                       <td>{e.overtime ? "Yes" : "No"}</td>
@@ -83,6 +84,7 @@ export default function AtRisk() {
           </>
         )}
       </Card>
+      </Reveal>
 
       <EmployeeDrawer userId={selected} onClose={() => setSelected(null)} />
     </>

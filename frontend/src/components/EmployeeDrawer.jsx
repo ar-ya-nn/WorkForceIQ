@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, fmt } from "../api.js";
-import { Badge, Drawer, ErrorBox, Loading } from "./ui.jsx";
+import { Avatar, Badge, Drawer, ErrorBox, Loading } from "./ui.jsx";
 
 const SCALE = { 1: "Low", 2: "Medium", 3: "High", 4: "Very high" };
 
@@ -35,11 +35,18 @@ export default function EmployeeDrawer({ userId, onClose }) {
   const d = data?.details;
 
   return (
-    <Drawer open={Boolean(userId)} onClose={onClose} title={d ? d.full_name : "Employee"}>
+    <Drawer open={Boolean(userId)} onClose={onClose} title="Employee profile">
       {error && <ErrorBox message={error} />}
-      {!data && !error && <Loading />}
+      {!data && !error && <Loading rows={7} />}
       {d && (
         <>
+          <div className="drawer-profile">
+            <Avatar name={d.full_name} size={56} />
+            <div>
+              <div className="drawer-name">{d.full_name}</div>
+              <div className="muted small">{d.job_role ?? d.role_name} · #{d.user_id}</div>
+            </div>
+          </div>
           <div className="drawer-tags">
             <Badge value={d.status} />
             {data.risk && <Badge value={data.risk.risk_level} />}

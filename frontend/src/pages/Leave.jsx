@@ -2,7 +2,7 @@ import { Check, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { api, fmt, useApi } from "../api.js";
 import EmployeeDrawer from "../components/EmployeeDrawer.jsx";
-import { Badge, Card, ErrorBox, Field, Loading, PageHeader, Pagination, Toast } from "../components/ui.jsx";
+import { Avatar, Badge, Card, ErrorBox, Field, Loading, PageHeader, Pagination, Reveal, Toast } from "../components/ui.jsx";
 
 const LIMIT = 12;
 const days = (start, end) => Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
@@ -85,7 +85,7 @@ export default function Leave() {
 
   return (
     <>
-      <PageHeader title="Leave Management" subtitle="Approvals run through the approve_leave stored procedure (one transaction)">
+      <PageHeader eyebrow="Transactions & triggers" title="Leave Management" subtitle="Approvals run through the approve_leave stored procedure, as one transaction">
         <Field label="Acting as">
           <select value={approver} onChange={(e) => setApproverId(e.target.value)}>
             {approvers.map((u) => (
@@ -95,8 +95,11 @@ export default function Leave() {
         </Field>
       </PageHeader>
 
-      <ApplyForm types={types.data} onDone={(t) => { setToast(t); leaves.reload(); }} />
+      <Reveal delay={0.1}>
+        <ApplyForm types={types.data} onDone={(t) => { setToast(t); leaves.reload(); }} />
+      </Reveal>
 
+      <Reveal delay={0.2}>
       <Card
         title="Leave requests"
         actions={
@@ -107,7 +110,7 @@ export default function Leave() {
           </div>
         }
       >
-        {leaves.loading ? <Loading /> : leaves.error ? <ErrorBox message={leaves.error} /> : (
+        {leaves.loading ? <Loading rows={8} /> : leaves.error ? <ErrorBox message={leaves.error} /> : (
           <>
             <div className="table-wrap">
               <table className="table">
@@ -118,7 +121,7 @@ export default function Leave() {
                   {leaves.data.items.map((l) => (
                     <tr key={l.leave_id}>
                       <td className="muted">{l.leave_id}</td>
-                      <td><button className="link" onClick={() => setSelected(l.user_id)}>{l.employee_name}</button><div className="muted small">#{l.user_id}</div></td>
+                      <td><div className="person"><Avatar name={l.employee_name} /><div><button className="link" onClick={() => setSelected(l.user_id)}>{l.employee_name}</button><div className="muted small">#{l.user_id}</div></div></div></td>
                       <td>{typeName[l.leave_type_id]}</td>
                       <td>{fmt.date(l.start_date)} → {fmt.date(l.end_date)}</td>
                       <td>{days(l.start_date, l.end_date)}</td>
@@ -139,6 +142,7 @@ export default function Leave() {
           </>
         )}
       </Card>
+      </Reveal>
 
       <Toast toast={toast} onClose={closeToast} />
       <EmployeeDrawer userId={selected} onClose={() => setSelected(null)} />

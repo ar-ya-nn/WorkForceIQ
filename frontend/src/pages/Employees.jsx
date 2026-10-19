@@ -2,7 +2,7 @@ import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ROLE_NAMES, fmt, useApi } from "../api.js";
 import EmployeeDrawer from "../components/EmployeeDrawer.jsx";
-import { Badge, Card, ErrorBox, Loading, PageHeader, Pagination } from "../components/ui.jsx";
+import { Badge, Card, ErrorBox, Loading, PageHeader, Pagination, Person, Reveal } from "../components/ui.jsx";
 
 const LIMIT = 15;
 
@@ -29,7 +29,7 @@ export default function Employees() {
 
   return (
     <>
-      <PageHeader title="Employees" subtitle="Everyone in the organisation">
+      <PageHeader eyebrow="Directory" title="Employees" subtitle="Everyone in the organisation, straight from the users table">
         <div className="search">
           <Search size={16} />
           <input placeholder="Search name or email…" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
@@ -45,8 +45,9 @@ export default function Employees() {
         </select>
       </PageHeader>
 
+      <Reveal delay={0.1}>
       <Card>
-        {users.loading ? <Loading /> : users.error ? <ErrorBox message={users.error} /> : (
+        {users.loading ? <Loading rows={8} /> : users.error ? <ErrorBox message={users.error} /> : (
           <>
             <div className="table-wrap">
               <table className="table clickable">
@@ -57,7 +58,7 @@ export default function Employees() {
                   {users.data.items.map((u) => (
                     <tr key={u.user_id} onClick={() => setSelected(u.user_id)}>
                       <td className="muted">#{u.user_id}</td>
-                      <td><strong>{u.first_name} {u.last_name}</strong><div className="muted small">{u.email}</div></td>
+                      <td><Person name={`${u.first_name} ${u.last_name}`} sub={u.email} /></td>
                       <td>{ROLE_NAMES[u.role_id]}</td>
                       <td>{deptName[u.department_id] ?? "—"}</td>
                       <td>{fmt.date(u.joining_date)}</td>
@@ -72,6 +73,7 @@ export default function Employees() {
           </>
         )}
       </Card>
+      </Reveal>
 
       <EmployeeDrawer userId={selected} onClose={() => setSelected(null)} />
     </>

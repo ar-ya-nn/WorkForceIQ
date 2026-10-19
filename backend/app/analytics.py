@@ -39,11 +39,33 @@ def overview(db: Session = Depends(get_db)):
             (SELECT COUNT(*) FROM leave_requests WHERE status = 'PENDING') AS pending_leave_requests,
             (SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE status IN ('PRESENT', 'LATE'))
                           / NULLIF(COUNT(*), 0), 2)
-             FROM attendance WHERE date >= CURRENT_DATE - 30)     AS attendance_rate_30d_pct
+             FROM attendance
+             WHERE date BETWEEN (SELECT MAX(date) FROM attendance WHERE status <> 'ON_LEAVE') - 30
+                            AND (SELECT MAX(date) FROM attendance WHERE status <> 'ON_LEAVE')) AS attendance_rate_30d_pct
         FROM users u
         JOIN employee_profiles p ON p.user_id = u.user_id
     """)).mappings().first()
     return dict(row)
+
+
+@router.get("/attendance-trend")
+def attendance_trend(db: Session = Depends(get_db)):
+    """Daily attendance rate over the last 30 working days of recorded attendance."""
+    rows = db.execute(text("""
+        SELECT date,
+               COUNT(*)                                                AS employees,
+               COUNT(*) FILTER (WHERE status = 'LATE')                 AS late,
+               COUNT(*) FILTER (WHERE status = 'ABSENT')               AS absent,
+               COUNT(*) FILTER (WHERE status = 'ON_LEAVE')             AS on_leave,
+               ROUND(100.0 * COUNT(*) FILTER (WHERE status IN ('PRESENT', 'LATE'))
+                     / NULLIF(COUNT(*), 0), 2)                         AS attendance_rate_pct
+        FROM attendance
+        WHERE date BETWEEN (SELECT MAX(date) FROM attendance WHERE status <> 'ON_LEAVE') - 45
+                       AND (SELECT MAX(date) FROM attendance WHERE status <> 'ON_LEAVE')
+        GROUP BY date
+        ORDER BY date
+    """)).mappings().all()
+    return [dict(r) for r in rows]
 
 
 @router.get("/departments")

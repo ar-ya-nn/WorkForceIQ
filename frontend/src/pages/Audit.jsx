@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Fragment, useState } from "react";
 import { fmt, useApi } from "../api.js";
-import { Badge, Card, ErrorBox, Loading, PageHeader, Pagination } from "../components/ui.jsx";
+import { Badge, Card, ErrorBox, Loading, PageHeader, Pagination, Reveal } from "../components/ui.jsx";
 
 const LIMIT = 15;
 
@@ -27,7 +27,7 @@ export default function Audit() {
 
   return (
     <>
-      <PageHeader title="Audit Log" subtitle="Written automatically by PostgreSQL triggers on every insert, update and delete">
+      <PageHeader eyebrow="Triggers" title="Audit Log" subtitle="Written automatically by PostgreSQL triggers on every insert, update and delete">
         <select value={table} onChange={(e) => { setTable(e.target.value); setSkip(0); }}>
           <option value="">All tables</option>
           <option value="users">users</option>
@@ -44,8 +44,9 @@ export default function Audit() {
         <button className="btn ghost" onClick={logs.reload}>Refresh</button>
       </PageHeader>
 
+      <Reveal delay={0.1}>
       <Card>
-        {logs.loading ? <Loading /> : logs.error ? <ErrorBox message={logs.error} /> : logs.data.total === 0 ? (
+        {logs.loading ? <Loading rows={8} /> : logs.error ? <ErrorBox message={logs.error} /> : logs.data.total === 0 ? (
           <div className="state muted">
             No changes yet. Approve a leave request or update an employee's salary from the API docs, then refresh.
           </div>
@@ -95,6 +96,7 @@ export default function Audit() {
           </>
         )}
       </Card>
+      </Reveal>
     </>
   );
 }

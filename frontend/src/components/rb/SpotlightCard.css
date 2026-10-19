@@ -1,0 +1,46 @@
+/*
+  TEMPORARY STAND-IN. Not the official React Bits file.
+  The official SpotlightCard.css (the "CSS" tab on reactbits.dev/components/spotlight-card)
+  was missing from the upload. Paste the official CSS over this whole file when you can.
+  This version only positions the layers the component draws into.
+*/
+.spotlight-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--spotlight-card-surface);
+  box-shadow: var(--spotlight-card-shadow);
+  border-radius: 18px;
+}
+
+.spotlight-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.spotlight-card__light,
+.spotlight-card__grain,
+.spotlight-card__border,
+.spotlight-card__edge {
+  position: absolute !important;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.spotlight-card__light { z-index: 0 !important; opacity: 0; }
+.spotlight-card__grain { z-index: 0 !important; opacity: 0; }
+
+.spotlight-card__border {
+  z-index: 2 !important;
+  border: 1px solid var(--spotlight-card-border);
+}
+
+.spotlight-card__edge {
+  z-index: 2 !important;
+  opacity: 0;
+  padding: 1px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}

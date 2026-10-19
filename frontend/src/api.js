@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
-const BASE = "/api";
+// Locally this is "/api" (forwarded to FastAPI by vite.config.js).
+// Online, set VITE_API_URL to the backend address, e.g. https://workforceiq-api.onrender.com
+const BASE = import.meta.env.VITE_API_URL || "/api";
 
 function toQuery(params) {
   if (!params) return "";

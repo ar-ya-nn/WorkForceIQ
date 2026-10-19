@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useApi } from "../api.js";
 import EmployeeDrawer from "../components/EmployeeDrawer.jsx";
-import { Card, ErrorBox, Loading, PageHeader, Pagination } from "../components/ui.jsx";
+import { Card, ErrorBox, Loading, PageHeader, Pagination, Person, Reveal } from "../components/ui.jsx";
 
 const LIMIT = 15;
 
@@ -15,15 +15,16 @@ export default function Attendance() {
 
   return (
     <>
-      <PageHeader title="Attendance" subtitle="Last 30 days per active employee, lowest attendance first">
+      <PageHeader eyebrow="Daily tracking" title="Attendance" subtitle="Last 30 days per active employee, lowest attendance first (v_attendance_summary)">
         <select value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setSkip(0); }}>
           <option value="">All departments</option>
           {departments.data?.map((d) => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
         </select>
       </PageHeader>
 
+      <Reveal delay={0.1}>
       <Card>
-        {summary.loading ? <Loading /> : summary.error ? <ErrorBox message={summary.error} /> : (
+        {summary.loading ? <Loading rows={8} /> : summary.error ? <ErrorBox message={summary.error} /> : (
           <>
             <div className="table-wrap">
               <table className="table clickable">
@@ -36,7 +37,7 @@ export default function Attendance() {
                     const tone = rate >= 95 ? "LOW" : rate >= 85 ? "MEDIUM" : "HIGH";
                     return (
                       <tr key={a.user_id} onClick={() => setSelected(a.user_id)}>
-                        <td><strong>{a.full_name}</strong><div className="muted small">#{a.user_id}</div></td>
+                        <td><Person name={a.full_name} sub={`#${a.user_id}`} /></td>
                         <td>{a.present_days}</td>
                         <td className={a.late_days > 3 ? "amber" : ""}>{a.late_days}</td>
                         <td className={a.absent_days > 2 ? "red" : ""}>{a.absent_days}</td>
@@ -57,6 +58,7 @@ export default function Attendance() {
           </>
         )}
       </Card>
+      </Reveal>
 
       <EmployeeDrawer userId={selected} onClose={() => setSelected(null)} />
     </>
