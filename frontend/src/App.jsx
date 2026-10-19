@@ -97,8 +97,8 @@ export default function App() {
         <span className="glow glow-1" />
         <span className="glow glow-2" />
         <span className="glow glow-3" />
+        <span className="glow glow-core" />
       </div>
-      <div className="bg-grid" aria-hidden="true" />
       <ClickSpark sparkColor={["#a78bfa", "#22d3ee", "#f472b6"]} sparkCount={10} sparkRadius={26} sparkSize={12} glow={0.4}>
       <div className="layout">
         <Sidebar />
