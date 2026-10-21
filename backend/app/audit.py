@@ -3,11 +3,13 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from backend.app.auth import ADMIN, require_roles
 from backend.app.database import get_db
 from backend.app.models import AuditLog
 from backend.app.schemas import AuditLogResponse, Page
 
-router = APIRouter(prefix="/audit", tags=["Audit"])
+# The change history contains salaries and personal data: admins only.
+router = APIRouter(prefix="/audit", tags=["Audit"], dependencies=[Depends(require_roles(ADMIN))])
 
 
 @router.get("/", response_model=Page[AuditLogResponse])

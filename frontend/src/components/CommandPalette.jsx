@@ -3,7 +3,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api.js";
-import { NAV } from "../nav.js";
+import { useAuth } from "../auth.jsx";
+import { navFor } from "../nav.js";
 
 /** Ctrl+K / Cmd+K search: jump to any page or open any employee's profile. */
 export default function CommandPalette({ open, onClose, onOpenEmployee }) {
@@ -12,6 +13,8 @@ export default function CommandPalette({ open, onClose, onOpenEmployee }) {
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canSearchPeople = user && user.role !== "EMPLOYEE";   // employees can't list other people
 
   useEffect(() => {
     if (open) {
@@ -23,7 +26,7 @@ export default function CommandPalette({ open, onClose, onOpenEmployee }) {
   }, [open]);
 
   useEffect(() => {
-    if (!open || query.trim().length < 2) {
+    if (!open || !canSearchPeople || query.trim().length < 2) {
       setPeople([]);
       return;
     }
@@ -33,14 +36,14 @@ export default function CommandPalette({ open, onClose, onOpenEmployee }) {
         .catch(() => setPeople([]));
     }, 220);
     return () => clearTimeout(t);
-  }, [query, open]);
+  }, [query, open, canSearchPeople]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const pages = NAV.filter((n) => !q || n.label.toLowerCase().includes(q)).map((n) => ({ type: "page", ...n }));
+    const pages = navFor(user).filter((n) => !q || n.label.toLowerCase().includes(q)).map((n) => ({ type: "page", ...n }));
     const users = people.map((u) => ({ type: "user", ...u }));
     return [...users, ...pages];
-  }, [query, people]);
+  }, [query, people, user]);
 
   const choose = (item) => {
     if (!item) return;
@@ -75,7 +78,7 @@ export default function CommandPalette({ open, onClose, onOpenEmployee }) {
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setActive(0); }}
                 onKeyDown={onKeyDown}
-                placeholder="Search employees or jump to a page…"
+                placeholder={canSearchPeople ? "Search employees or jump to a page…" : "Jump to a page…"}
               />
               <kbd>Esc</kbd>
             </div>
@@ -101,7 +104,7 @@ export default function CommandPalette({ open, onClose, onOpenEmployee }) {
                 );
               })}
             </div>
-            <div className="palette-foot muted small">↑ ↓ to move · Enter to open · type 2+ letters to search people</div>
+            <div className="palette-foot muted small">{canSearchPeople ? "↑ ↓ to move · Enter to open · type 2+ letters to search people" : "↑ ↓ to move · Enter to open"}</div>
           </motion.div>
         </motion.div>
       )}

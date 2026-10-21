@@ -3,11 +3,12 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from backend.app.auth import get_current_user
 from backend.app.database import get_db
 from backend.app.models import Department
 from backend.app.schemas import DepartmentResponse
 
-router = APIRouter(prefix="/departments", tags=["Departments"])
+router = APIRouter(prefix="/departments", tags=["Departments"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=List[DepartmentResponse])

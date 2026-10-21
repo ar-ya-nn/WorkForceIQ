@@ -14,12 +14,30 @@ function toQuery(params) {
   return s ? `?${s}` : "";
 }
 
+// ---------- login token ----------
+// The JWT from /auth/login is kept in localStorage and sent with every request.
+const TOKEN_KEY = "wfiq_token";
+export const tokenStore = {
+  get: () => localStorage.getItem(TOKEN_KEY),
+  set: (token) => localStorage.setItem(TOKEN_KEY, token),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+};
+
 async function request(path, options = {}) {
+  const token = tokenStore.get();
   const res = await fetch(BASE + path, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
   const body = await res.json().catch(() => null);
+  if (res.status === 401 && token) {
+    // token expired or user deactivated: send them back to the login screen
+    tokenStore.clear();
+    window.dispatchEvent(new Event("wfiq:logout"));
+  }
   if (!res.ok) {
     const detail = body?.detail;
     const message =

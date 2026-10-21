@@ -103,7 +103,7 @@ class LeaveListItem(LeaveResponse):
 
 
 class LeaveCreate(BaseModel):
-    user_id: int
+    user_id: Optional[int] = None      # left out = "for myself"; employees are always forced to themselves
     leave_type_id: int
     start_date: date
     end_date: date
@@ -114,10 +114,6 @@ class LeaveCreate(BaseModel):
         if self.end_date < self.start_date:
             raise ValueError("end_date cannot be before start_date")
         return self
-
-
-class LeaveDecision(BaseModel):
-    approver_id: int
 
 
 # ---------- Reviews & audit ----------

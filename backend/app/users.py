@@ -6,6 +6,8 @@ from sqlalchemy import or_, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
+from backend.app.auth import (ADMIN, MANAGER, CurrentUser, department_scope, ensure_can_view,
+                              get_current_user, require_roles)
 from backend.app.database import db_error_message, get_db
 from backend.app.models import PerformanceReview, User
 from backend.app.schemas import Page, ReviewResponse, UserCreate, UserResponse, UserUpdate
@@ -22,7 +24,11 @@ def list_users(
     status: Optional[Literal["ACTIVE", "EXITED"]] = None,
     search: Optional[str] = Query(None, description="Matches first name, last name or email"),
     db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_roles(ADMIN, MANAGER)),
 ):
+    scope = department_scope(user)
+    if scope is not None:              # managers only ever see their own department
+        department_id = scope
     query = db.query(User)
     if department_id is not None:
         query = query.filter(User.department_id == department_id)
@@ -42,9 +48,19 @@ def list_users(
             "items": [UserResponse.model_validate(u) for u in users]}
 
 
+@router.get("/me")
+def my_details(db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user)):
+    """The logged-in user's own details. Every role can use this."""
+    row = db.execute(text("SELECT * FROM v_employee_details WHERE user_id = :id"),
+                     {"id": user.user_id}).mappings().first()
+    return dict(row) if row else {}
+
+
 @router.get("/{user_id}")
-def get_user_details(user_id: int, db: Session = Depends(get_db)):
+def get_user_details(user_id: int, db: Session = Depends(get_db),
+                     user: CurrentUser = Depends(get_current_user)):
     """Full employee details (user + department + role + HR profile) from v_employee_details."""
+    ensure_can_view(db, user, user_id)
     row = db.execute(text("SELECT * FROM v_employee_details WHERE user_id = :id"),
                      {"id": user_id}).mappings().first()
     if row is None:
@@ -53,7 +69,9 @@ def get_user_details(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}/reviews", response_model=List[ReviewResponse])
-def get_user_reviews(user_id: int, db: Session = Depends(get_db)):
+def get_user_reviews(user_id: int, db: Session = Depends(get_db),
+                     user: CurrentUser = Depends(get_current_user)):
+    ensure_can_view(db, user, user_id)
     return (db.query(PerformanceReview)
               .filter(PerformanceReview.user_id == user_id)
               .order_by(PerformanceReview.review_date.desc())
@@ -61,9 +79,12 @@ def get_user_reviews(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=UserResponse, status_code=201)
-def create_user(data: UserCreate, db: Session = Depends(get_db)):
+def create_user(data: UserCreate, db: Session = Depends(get_db),
+                _: CurrentUser = Depends(require_roles(ADMIN))):
     password_hash = bcrypt.hashpw(data.password.encode(), bcrypt.gensalt()).decode()
-    user = User(**data.model_dump(exclude={"password"}), password_hash=password_hash)
+    fields = data.model_dump(exclude={"password"})
+    fields["email"] = fields["email"].lower()
+    user = User(**fields, password_hash=password_hash)
     db.add(user)
     try:
         db.commit()
@@ -78,7 +99,8 @@ def create_user(data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
-def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db)):
+def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db),
+                _: CurrentUser = Depends(require_roles(ADMIN))):
     """Every change here is recorded in audit_logs by the trg_audit_users trigger."""
     user = db.get(User, user_id)
     if user is None:

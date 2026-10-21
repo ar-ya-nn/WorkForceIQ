@@ -109,11 +109,11 @@ const BADGE_TONES = {
   INSERT: "green", UPDATE: "amber", DELETE: "red",
 };
 
-export function Badge({ value }) {
+export function Badge({ value, label }) {
   return (
     <span className={`badge badge-${BADGE_TONES[value] || "grey"}`}>
       <span className="badge-dot" />
-      {String(value).replace("_", " ")}
+      {label ?? String(value).replace("_", " ")}
     </span>
   );
 }

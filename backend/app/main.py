@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.analytics import router as analytics_router
 from backend.app.attendance import router as attendance_router
+from backend.app.auth import router as auth_router
 from backend.app.audit import router as audit_router
 from backend.app.database import get_db
 from backend.app.departments import router as departments_router
@@ -26,6 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(departments_router)
 app.include_router(attendance_router)

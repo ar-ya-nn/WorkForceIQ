@@ -5,8 +5,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.app.auth import (ADMIN, EMPLOYEE, MANAGER, CurrentUser, department_scope,
+                              ensure_can_view, get_current_user, require_roles)
 from backend.app.database import get_db
-from backend.app.models import Attendance
+from backend.app.models import Attendance, User
 from backend.app.schemas import AttendanceResponse, Page
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
@@ -21,8 +23,18 @@ def list_attendance(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ):
+    """Admin: everyone. Manager: own department. Employee: only their own records."""
+    if user.role == EMPLOYEE:
+        user_id = user.user_id
+    elif user_id is not None:
+        ensure_can_view(db, user, user_id)
+
     query = db.query(Attendance)
+    scope = department_scope(user)
+    if user.role == MANAGER:
+        query = query.join(User, User.user_id == Attendance.user_id).filter(User.department_id == scope)
     if user_id is not None:
         query = query.filter(Attendance.user_id == user_id)
     if status is not None:
@@ -45,8 +57,12 @@ def attendance_summary(
     limit: int = Query(50, ge=1, le=500),
     department_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_roles(ADMIN, MANAGER)),
 ):
     """Last-30-day attendance per active employee (v_attendance_summary), lowest attendance first."""
+    scope = department_scope(user)
+    if scope is not None:
+        department_id = scope
     where = "WHERE department_id = :dept" if department_id is not None else ""
     params = {"dept": department_id, "skip": skip, "limit": limit}
 

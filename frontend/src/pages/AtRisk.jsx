@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { fmt, useApi } from "../api.js";
+import { useAuth } from "../auth.jsx";
 import EmployeeDrawer from "../components/EmployeeDrawer.jsx";
 import { Badge, Card, ErrorBox, Loading, PageHeader, Pagination, Person, Reveal } from "../components/ui.jsx";
 
 const LIMIT = 15;
 
 export default function AtRisk() {
+  const { user } = useAuth();
+  const isAdmin = user.role === "ADMIN";
   const [riskLevel, setRiskLevel] = useState("HIGH");
   const [departmentId, setDepartmentId] = useState("");
   const [skip, setSkip] = useState(0);
@@ -22,17 +25,19 @@ export default function AtRisk() {
 
   return (
     <>
-      <PageHeader eyebrow="Machine learning" title="Attrition Risk" subtitle="Active employees ranked by their predicted risk of leaving">
+      <PageHeader eyebrow="Machine learning" title="Attrition Risk" subtitle={isAdmin ? "Active employees ranked by their predicted risk of leaving" : `${user.department_name}: active employees ranked by predicted risk of leaving`}>
         <select value={riskLevel} onChange={changeFilter(setRiskLevel)}>
           <option value="">All risk levels</option>
           <option value="HIGH">High risk</option>
           <option value="MEDIUM">Medium risk</option>
           <option value="LOW">Low risk</option>
         </select>
-        <select value={departmentId} onChange={changeFilter(setDepartmentId)}>
-          <option value="">All departments</option>
-          {departments.data?.map((d) => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
-        </select>
+        {isAdmin && (
+          <select value={departmentId} onChange={changeFilter(setDepartmentId)}>
+            <option value="">All departments</option>
+            {departments.data?.map((d) => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
+          </select>
+        )}
       </PageHeader>
 
       {summary.data && (

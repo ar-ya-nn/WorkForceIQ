@@ -1,12 +1,15 @@
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ROLE_NAMES, fmt, useApi } from "../api.js";
+import { useAuth } from "../auth.jsx";
 import EmployeeDrawer from "../components/EmployeeDrawer.jsx";
 import { Badge, Card, ErrorBox, Loading, PageHeader, Pagination, Person, Reveal } from "../components/ui.jsx";
 
 const LIMIT = 15;
 
 export default function Employees() {
+  const { user } = useAuth();
+  const isAdmin = user.role === "ADMIN";
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
   const [departmentId, setDepartmentId] = useState("");
@@ -29,15 +32,17 @@ export default function Employees() {
 
   return (
     <>
-      <PageHeader eyebrow="Directory" title="Employees" subtitle="Everyone in the organisation, straight from the users table">
+      <PageHeader eyebrow="Directory" title="Employees" subtitle={isAdmin ? "Everyone in the organisation, straight from the users table" : `Your department: ${user.department_name}`}>
         <div className="search">
           <Search size={16} />
           <input placeholder="Search name or email…" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
         </div>
-        <select value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setSkip(0); }}>
-          <option value="">All departments</option>
-          {departments.data?.map((d) => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
-        </select>
+        {isAdmin && (
+          <select value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setSkip(0); }}>
+            <option value="">All departments</option>
+            {departments.data?.map((d) => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
+          </select>
+        )}
         <select value={status} onChange={(e) => { setStatus(e.target.value); setSkip(0); }}>
           <option value="">All statuses</option>
           <option value="ACTIVE">Active</option>

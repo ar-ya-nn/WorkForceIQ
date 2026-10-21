@@ -5,10 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.app.auth import ADMIN, MANAGER, CurrentUser, department_scope, ensure_can_view, require_roles
 from backend.app.database import get_db
 from backend.ml.train_model import METRICS_PATH
 
-router = APIRouter(prefix="/predictions", tags=["Attrition Predictions"])
+# Risk scores are sensitive: admins and managers only. Employees never see predictions.
+router = APIRouter(prefix="/predictions", tags=["Attrition Predictions"],
+                   dependencies=[Depends(require_roles(ADMIN, MANAGER))])
 
 
 @router.get("/")
@@ -18,8 +21,12 @@ def list_predictions(
     risk_level: Optional[Literal["HIGH", "MEDIUM", "LOW"]] = None,
     department_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_roles(ADMIN, MANAGER)),
 ):
     """Active employees ranked by attrition risk (highest first), from v_attrition_risk."""
+    scope = department_scope(user)
+    if scope is not None:              # managers: own department only
+        department_id = scope
     conditions, params = [], {"skip": skip, "limit": limit}
     if risk_level is not None:
         conditions.append("risk_level = :level")
@@ -73,7 +80,9 @@ def model_info():
 
 
 @router.get("/{user_id}")
-def get_prediction(user_id: int, db: Session = Depends(get_db)):
+def get_prediction(user_id: int, db: Session = Depends(get_db),
+                   user: CurrentUser = Depends(require_roles(ADMIN, MANAGER))):
+    ensure_can_view(db, user, user_id)
     row = db.execute(text("SELECT * FROM v_attrition_risk WHERE user_id = :id"),
                      {"id": user_id}).mappings().first()
     if row is None:

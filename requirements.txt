@@ -9,3 +9,4 @@ email-validator
 scikit-learn
 pandas
 joblib
+PyJWT

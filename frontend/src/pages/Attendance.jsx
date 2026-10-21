@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useApi } from "../api.js";
+import { useAuth } from "../auth.jsx";
 import EmployeeDrawer from "../components/EmployeeDrawer.jsx";
 import { Card, ErrorBox, Loading, PageHeader, Pagination, Person, Reveal } from "../components/ui.jsx";
 
 const LIMIT = 15;
 
 export default function Attendance() {
+  const { user } = useAuth();
+  const isAdmin = user.role === "ADMIN";
   const [departmentId, setDepartmentId] = useState("");
   const [skip, setSkip] = useState(0);
   const [selected, setSelected] = useState(null);
@@ -15,11 +18,13 @@ export default function Attendance() {
 
   return (
     <>
-      <PageHeader eyebrow="Daily tracking" title="Attendance" subtitle="Last 30 days per active employee, lowest attendance first (v_attendance_summary)">
-        <select value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setSkip(0); }}>
-          <option value="">All departments</option>
-          {departments.data?.map((d) => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
-        </select>
+      <PageHeader eyebrow="Daily tracking" title="Attendance" subtitle={isAdmin ? "Last 30 days per active employee, lowest attendance first (v_attendance_summary)" : `${user.department_name}: last 30 days, lowest attendance first`}>
+        {isAdmin && (
+          <select value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setSkip(0); }}>
+            <option value="">All departments</option>
+            {departments.data?.map((d) => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
+          </select>
+        )}
       </PageHeader>
 
       <Reveal delay={0.1}>
