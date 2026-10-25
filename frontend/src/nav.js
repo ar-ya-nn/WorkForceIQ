@@ -1,4 +1,4 @@
-import { BrainCircuit, CalendarCheck, CalendarDays, History, LayoutDashboard, TriangleAlert, UserRound, Users } from "lucide-react";
+import { BrainCircuit, CalendarCheck, CalendarDays, History, LayoutDashboard, Settings2, TriangleAlert, UserRound, Users } from "lucide-react";
 
 const ALL = ["ADMIN", "MANAGER", "EMPLOYEE"];
 const STAFF = ["ADMIN", "MANAGER"];
@@ -13,6 +13,10 @@ export const NAV = [
   { to: "/attendance", label: "Attendance", icon: CalendarCheck, roles: STAFF },
   { to: "/audit", label: "Audit Log", icon: History, roles: ["ADMIN"] },
   { to: "/model", label: "ML Model", icon: BrainCircuit, roles: STAFF },
+  { to: "/admin", label: "Administration", icon: Settings2, roles: ["ADMIN"] },
 ];
 
 export const navFor = (user) => NAV.filter((n) => user && n.roles.includes(user.role));
+
+// sessionStorage key for the current page (the address bar never shows it)
+export const PAGE_KEY = "wfiq_page";

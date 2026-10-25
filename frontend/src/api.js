@@ -55,6 +55,8 @@ export const api = {
   get: (path, params) => request(path + toQuery(params)),
   post: (path, data) => request(path, { method: "POST", body: JSON.stringify(data) }),
   patch: (path, data) => request(path, { method: "PATCH", body: JSON.stringify(data) }),
+  put: (path, data) => request(path, { method: "PUT", body: JSON.stringify(data) }),
+  del: (path) => request(path, { method: "DELETE" }),
 };
 
 /** Loads data from the API and re-loads whenever the path or params change. */

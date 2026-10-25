@@ -3,7 +3,28 @@ import { fmt, useApi } from "../api.js";
 import { Card, ChartGradients, ErrorBox, Loading, PageHeader, Reveal, StatCard } from "../components/ui.jsx";
 import { COLORS, axisProps, tooltipProps } from "./chartTheme.js";
 
-const pretty = (name) => name.replace(/_/g, " ");
+const CATEGORIES = ["department_name", "job_role", "business_travel", "marital_status", "education_field", "gender"];
+/** "job_role_Sales Representative" -> "Job role: Sales Representative" */
+const pretty = (name) => {
+  const cat = CATEGORIES.find((c) => name.startsWith(c + "_"));
+  const label = (x) => x.replace(/_/g, " ").replace(/^\w/, (ch) => ch.toUpperCase());
+  return cat ? `${label(cat.replace("_name", ""))}: ${name.slice(cat.length + 1).replace(/_/g, " ")}` : label(name);
+};
+
+/** The model's quality, said in everyday words. */
+function plainSummary(m) {
+  const recall = m.metrics.recall, precision = m.metrics.precision, auc = m.metrics.roc_auc;
+  const caught = Math.round(recall * 4);
+  const right = Math.max(1, Math.round(precision * 10));
+  const quality = auc >= 0.8 ? "good" : auc >= 0.7 ? "fair" : "weak";
+  const warning = m.top_factors.filter((f) => (f.weight ?? f.importance) > 0).slice(0, 3).map((f) => pretty(f.feature).toLowerCase());
+  return [
+    `The model does a ${quality} job of telling apart people who leave from people who stay.`,
+    `Out of every 4 employees who actually left, it would have flagged about ${caught}.`,
+    `When it flags someone, it's right about ${right} times in 10, so treat a flag as "worth a conversation", not a certainty.`,
+    warning.length ? `The strongest warning signs it learned are ${warning.slice(0, -1).join(", ")}${warning.length > 1 ? " and " : ""}${warning[warning.length - 1]}.` : null,
+  ].filter(Boolean);
+}
 
 export default function Model() {
   const info = useApi("/predictions/model-info");
@@ -21,6 +42,16 @@ export default function Model() {
   return (
     <>
       <PageHeader eyebrow="Machine learning" title="Attrition Model" subtitle={`${m.model_name} · trained ${fmt.datetime(m.trained_at)} on ${m.training_rows} employees`} />
+
+      <Reveal delay={0.05}>
+        <Card title="In plain words">
+          {plainSummary(m).map((line, i) => (
+            <p key={i} className="narrative" style={{ marginBottom: 8 }}>{i === 0 ? <strong>{line}</strong> : line}</p>
+          ))}
+          <p className="xai-note">Individual explanations ("why is this person at risk?") are in each employee's profile panel.
+            {m.explanation_method ? ` Explanation method: ${m.explanation_method}.` : ""}</p>
+        </Card>
+      </Reveal>
 
       <Reveal delay={0.1} className="grid stats">
         <StatCard label="ROC-AUC" value={m.metrics.roc_auc} decimals={3} tone="violet" hint="0.5 = guessing, 1.0 = perfect" />

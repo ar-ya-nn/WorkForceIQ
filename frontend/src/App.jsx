@@ -2,14 +2,12 @@ import { Command, LogOut, Search, ShieldAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
-import { useApi } from "./api.js";
 import { ROLE_LABEL, hasRole, useAuth } from "./auth.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import EmployeeDrawer from "./components/EmployeeDrawer.jsx";
 import { Avatar } from "./components/ui.jsx";
-import ClickSpark from "./components/rb/ClickSpark.jsx";
-import ShinyText from "./components/rb/ShinyText.jsx";
-import { NAV, navFor } from "./nav.js";
+import { NAV, PAGE_KEY, navFor } from "./nav.js";
+import Admin from "./pages/Admin.jsx";
 import AtRisk from "./pages/AtRisk.jsx";
 import Attendance from "./pages/Attendance.jsx";
 import Audit from "./pages/Audit.jsx";
@@ -20,22 +18,16 @@ import Model from "./pages/Model.jsx";
 import MySpace from "./pages/MySpace.jsx";
 import Overview from "./pages/Overview.jsx";
 
-function ApiStatus() {
-  const { data, error } = useApi("/health");
-  const ok = data?.status === "healthy" && !error;
-  return (
-    <div className={`api-status ${ok ? "ok" : "down"}`}>
-      <span className="pulse" />
-      {ok ? "Database connected" : "API offline"}
-    </div>
-  );
-}
+const PAGES = {
+  "/": Overview, "/me": MySpace, "/at-risk": AtRisk, "/employees": Employees, "/leave": Leave,
+  "/attendance": Attendance, "/audit": Audit, "/model": Model, "/admin": Admin,
+};
 
 function UserCard() {
   const { user, logout } = useAuth();
   return (
     <div className="user-card">
-      <Avatar name={user.name} size={36} />
+      <Avatar name={user.name} size={34} />
       <div className="user-card-text">
         <div className="person-name">{user.name}</div>
         <div className="muted small">{ROLE_LABEL[user.role]}{user.department_name ? ` · ${user.department_name}` : ""}</div>
@@ -52,18 +44,17 @@ function Sidebar() {
       <div className="brand">
         <div className="brand-mark">W</div>
         <div>
-          <ShinyText text="WorkForceIQ" color="#cfd2ff" shineColor="#ffffff" speed={3} glow={0.3} className="brand-name" />
-          <div className="brand-sub">HR Analytics</div>
+          <div className="brand-name">WorkForceIQ</div>
+          <div className="brand-sub">Workforce analytics</div>
         </div>
       </div>
-      <div className="nav-label">Menu</div>
       <nav>
         {navFor(user).map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === "/"} className="nav-link">
             {({ isActive }) => (
               <>
                 {isActive && (
-                  <motion.span layoutId="nav-active" className="nav-active" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
+                  <motion.span layoutId="nav-active" className="nav-active" transition={{ type: "spring", stiffness: 500, damping: 40 }} />
                 )}
                 <Icon size={18} className="nav-icon" />
                 <span className="nav-text">{label}</span>
@@ -73,23 +64,22 @@ function Sidebar() {
         ))}
       </nav>
       <UserCard />
-      <ApiStatus />
     </aside>
   );
 }
 
 function TopBar({ onSearch }) {
   const { user } = useAuth();
-  const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
   const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
   return (
     <header className="topbar">
       <button className="search-trigger" onClick={onSearch}>
-        <Search size={16} />
-        <span>{user.role === "EMPLOYEE" ? "Jump to a page…" : "Search employees, pages…"}</span>
-        <kbd>{isMac ? <Command size={12} /> : "Ctrl"} K</kbd>
+        <Search size={15} />
+        <span>{user.role === "EMPLOYEE" ? "Go to…" : "Search"}</span>
+        <kbd>{isMac ? <Command size={11} /> : "Ctrl"} K</kbd>
       </button>
-      <div className="topbar-right muted small">{today}</div>
+      <div className="topbar-right">{today}</div>
     </header>
   );
 }
@@ -110,20 +100,16 @@ function Guard({ path, children }) {
   return children;
 }
 
-const PAGES = {
-  "/": Overview, "/me": MySpace, "/at-risk": AtRisk, "/employees": Employees,
-  "/leave": Leave, "/attendance": Attendance, "/audit": Audit, "/model": Model,
-};
-
-function Splash() {
-  return <div className="splash"><div className="brand-mark">W</div></div>;
-}
-
 export default function App() {
   const { user, checking } = useAuth();
   const location = useLocation();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [employeeId, setEmployeeId] = useState(null);
+
+  // remember the current page for this tab (the address bar itself never changes)
+  useEffect(() => {
+    sessionStorage.setItem(PAGE_KEY, location.pathname);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -137,24 +123,13 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [user]);
 
-  const background = (
-    <div className="glow-bg" aria-hidden="true">
-      <span className="glow glow-1" />
-      <span className="glow glow-2" />
-      <span className="glow glow-3" />
-      <span className="glow glow-core" />
-    </div>
-  );
-
-  if (checking) return <>{background}<Splash /></>;
-  if (!user) return <>{background}<Login /></>;
+  if (checking) return <div className="splash"><div className="brand-mark">W</div></div>;
+  if (!user) return <Login />;
 
   const home = user.role === "EMPLOYEE" ? "/me" : "/";
 
   return (
     <>
-      {background}
-      <ClickSpark sparkColor={["#a78bfa", "#22d3ee", "#f472b6"]} sparkCount={10} sparkRadius={26} sparkSize={12} glow={0.4}>
       <div className="layout">
         <Sidebar />
         <div className="main">
@@ -163,10 +138,10 @@ export default function App() {
             <motion.main
               key={location.pathname}
               className="content"
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
             >
               <Routes location={location}>
                 {Object.entries(PAGES).map(([path, Page]) => (
@@ -184,7 +159,6 @@ export default function App() {
           </AnimatePresence>
         </div>
       </div>
-      </ClickSpark>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onOpenEmployee={setEmployeeId} />
       <EmployeeDrawer userId={employeeId} onClose={() => setEmployeeId(null)} />

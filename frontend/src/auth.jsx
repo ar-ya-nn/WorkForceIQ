@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api, tokenStore } from "./api.js";
+import { PAGE_KEY } from "./nav.js";
 
 const AuthContext = createContext(null);
 
@@ -21,6 +22,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(() => {
     tokenStore.clear();
+    sessionStorage.removeItem(PAGE_KEY);   // next person to sign in starts on their own home page
     setUser(null);
   }, []);
 
@@ -29,15 +31,17 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener("wfiq:logout", logout);
   }, [logout]);
 
-  const login = async (email, password) => {
-    const result = await api.post("/auth/login", { email, password });
+  const finish = (result) => {
     tokenStore.set(result.access_token);
     setUser(result.user);
     return result.user;
   };
+  const login = async (email, password) => finish(await api.post("/auth/login", { email, password }));
+  // Google single sign-on: the backend verifies Google's ID token, then signs in the matching account
+  const loginWithGoogle = async (credential) => finish(await api.post("/auth/google", { credential }));
 
   return (
-    <AuthContext.Provider value={{ user, checking, login, logout }}>
+    <AuthContext.Provider value={{ user, checking, login, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

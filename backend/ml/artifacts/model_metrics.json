@@ -1,6 +1,6 @@
 {
   "model_name": "Logistic Regression",
-  "trained_at": "2026-10-07T14:50:45",
+  "trained_at": "2026-10-25T17:21:20",
   "training_rows": 1470,
   "validation": "5-fold stratified cross-validation (out-of-fold predictions)",
   "thresholds": {
@@ -105,5 +105,56 @@
     "HIGH": 160,
     "MEDIUM": 234,
     "LOW": 839
-  }
+  },
+  "explanation_method": "exact (logistic regression contributions)",
+  "calibration": [
+    {
+      "lo": 0.001,
+      "hi": 0.0406,
+      "n": 184,
+      "rate": 0.0272
+    },
+    {
+      "lo": 0.0406,
+      "hi": 0.1004,
+      "n": 184,
+      "rate": 0.038
+    },
+    {
+      "lo": 0.1004,
+      "hi": 0.1794,
+      "n": 183,
+      "rate": 0.0383
+    },
+    {
+      "lo": 0.1794,
+      "hi": 0.2848,
+      "n": 184,
+      "rate": 0.0707
+    },
+    {
+      "lo": 0.2848,
+      "hi": 0.4285,
+      "n": 184,
+      "rate": 0.0978
+    },
+    {
+      "lo": 0.4285,
+      "hi": 0.5887,
+      "n": 183,
+      "rate": 0.1585
+    },
+    {
+      "lo": 0.5887,
+      "hi": 0.7838,
+      "n": 184,
+      "rate": 0.25
+    },
+    {
+      "lo": 0.7838,
+      "hi": 0.995,
+      "n": 184,
+      "rate": 0.6087
+    }
+  ]
 }

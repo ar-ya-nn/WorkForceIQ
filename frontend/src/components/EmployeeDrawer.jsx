@@ -1,3 +1,4 @@
+import { Lightbulb, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, fmt } from "../api.js";
 import { Avatar, Badge, Drawer, ErrorBox, Loading } from "./ui.jsx";
@@ -15,17 +16,18 @@ export default function EmployeeDrawer({ userId, onClose }) {
     setError(null);
     Promise.allSettled([
       api.get(`/users/${userId}`),
-      api.get(`/predictions/${userId}`),
+      api.get(`/predictions/${userId}/explain`),
       api.get(`/leave/balance/${userId}`),
       api.get(`/users/${userId}/reviews`),
-    ]).then(([details, risk, balance, reviews]) => {
+    ]).then(([details, explain, balance, reviews]) => {
       if (details.status === "rejected") {
         setError(details.reason.message);
         return;
       }
       setData({
         details: details.value,
-        risk: risk.status === "fulfilled" ? risk.value : null,
+        explain: explain.status === "fulfilled" ? explain.value : null,
+        explainError: explain.status === "rejected" ? explain.reason.message : null,
         balance: balance.status === "fulfilled" ? balance.value : [],
         reviews: reviews.status === "fulfilled" ? reviews.value : [],
       });
@@ -49,18 +51,13 @@ export default function EmployeeDrawer({ userId, onClose }) {
           </div>
           <div className="drawer-tags">
             <Badge value={d.status} />
-            {data.risk && <Badge value={data.risk.risk_level} />}
+            {data.explain && <Badge value={data.explain.level} label={data.explain.headline} />}
             <span className="muted small">{d.role_name} · {d.department_name ?? "No department"}</span>
           </div>
 
-          {data.risk && (
-            <div className="risk-meter">
-              <div className="risk-meter-label">
-                <span>Attrition risk</span>
-                <strong>{(Number(data.risk.risk_score) * 100).toFixed(0)}%</strong>
-              </div>
-              <div className="bar"><div className={`bar-fill risk-${data.risk.risk_level}`} style={{ width: `${Number(data.risk.risk_score) * 100}%` }} /></div>
-            </div>
+          {data.explain && <Explanation x={data.explain} />}
+          {!data.explain && data.explainError && d.status === "ACTIVE" && (
+            <p className="xai-note" style={{ marginTop: 16 }}>{data.explainError}</p>
           )}
 
           <h4>Profile</h4>
@@ -108,5 +105,60 @@ export default function EmployeeDrawer({ userId, onClose }) {
         </>
       )}
     </Drawer>
+  );
+}
+
+
+/** Explainable AI in plain language: why this person is (or isn't) at risk, and what could help. */
+function Explanation({ x }) {
+  return (
+    <div className="xai">
+      <div className="xai-head">
+        <div className="xai-headline"><Sparkles size={18} /> {x.headline}</div>
+        <p className="xai-summary">{x.summary}</p>
+        {x.likelihood && <p className="xai-likelihood">{x.likelihood}{x.caution ? ` ${x.caution}` : ""}</p>}
+      </div>
+
+      {x.reasons_up.length > 0 && (
+        <div>
+          <h4>What raises the risk</h4>
+          <ul className="xai-list">
+            {x.reasons_up.map((r) => (
+              <li key={r.text}>
+                <span className="xai-mark up">↑</span>
+                <span>{r.text}{r.personal && <span className="xai-personal"> · personal background, not something to act on</span>}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {x.reasons_down.length > 0 && (
+        <div>
+          <h4>What keeps them here</h4>
+          <ul className="xai-list">
+            {x.reasons_down.map((r) => (
+              <li key={r.text}><span className="xai-mark down">↓</span><span>{r.text}</span></li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {x.actions.length > 0 && (
+        <div>
+          <h4>Suggested next steps</h4>
+          <div className="stack" style={{ gap: 8 }}>
+            {x.actions.map((a) => (
+              <div key={a.action} className="xai-action">
+                <strong><Lightbulb size={14} style={{ verticalAlign: -2, marginRight: 6 }} />{a.action}</strong>
+                <span>{a.because}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="xai-note">{x.disclaimer}{x.method ? ` Method: ${x.method}.` : ""}</p>
+    </div>
   );
 }

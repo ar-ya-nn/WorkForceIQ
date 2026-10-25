@@ -7,14 +7,13 @@ import {
 } from "recharts";
 import { useApi } from "../api.js";
 import AnimatedContent from "../components/rb/AnimatedContent.jsx";
-import BlurText from "../components/rb/BlurText.jsx";
 import CountUp from "../components/rb/CountUp.jsx";
-import GradientText from "../components/rb/GradientText.jsx";
 import { Card, ChartGradients, ChartLoading, ErrorBox, Reveal, StatCard } from "../components/ui.jsx";
 import { COLORS, axisProps, tooltipProps } from "./chartTheme.js";
 
 const FACTORS = {
   overtime: "Overtime",
+  gender: "Gender",
   job_satisfaction: "Job satisfaction",
   work_life_balance: "Work-life balance",
   environment_satisfaction: "Environment satisfaction",
@@ -61,6 +60,43 @@ function buildInsights({ overtime, departments, risk, jobRoles }) {
   return insights;
 }
 
+/** Men vs women at a glance: past attrition and current predicted risk, in plain words. */
+function GenderCard() {
+  const actual = useApi("/analytics/attrition/by/gender");
+  const risk = useApi("/predictions/breakdown", { by: "gender" });
+  const groups = (actual.data?.groups ?? []).map((g) => {
+    const r = risk.data?.groups.find((x) => x.grp === g.value);
+    return { ...g, high: r?.high, avgRisk: r?.avg_risk_pct, now: r?.employees };
+  });
+  const sorted = [...groups].sort((a, b) => b.attrition_rate_pct - a.attrition_rate_pct);
+  const lead = sorted.length === 2
+    ? (Math.abs(sorted[0].attrition_rate_pct - sorted[1].attrition_rate_pct) < 1
+        ? "Men and women have left at about the same rate."
+        : `${sorted[0].value === "Male" ? "Men" : "Women"} have left slightly more often than ${sorted[1].value === "Male" ? "men" : "women"}.`)
+    : null;
+
+  return (
+    <Card title="Attrition by gender" subtitle="Who left in the past, and who the model thinks may leave now.">
+      {actual.loading || risk.loading ? <ChartLoading /> : actual.error ? <ErrorBox message={actual.error} /> : (
+        <>
+          {lead && <p className="narrative"><strong>{lead}</strong> Differences describe the data, not a cause.</p>}
+          <div className="compare-groups" style={{ marginBottom: 0 }}>
+            {groups.map((g) => (
+              <div key={g.value} className="compare-group">
+                <div className="compare-group-name">{g.value === "Male" ? "Men" : g.value === "Female" ? "Women" : g.value}</div>
+                <div className="compare-group-risk">{Number(g.attrition_rate_pct).toFixed(1)}%</div>
+                <div className="muted small">left in the past ({g.employees_left} of {g.total_employees})</div>
+                {g.high != null && <div className="compare-row"><span>Likely to leave now</span><strong className="red">{g.high} of {g.now}</strong></div>}
+                {risk.error && <div className="compare-row"><span className="muted small">Run update_v2.sql to see current risk by gender.</span></div>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 function RetentionGauge({ attrition }) {
   const retention = attrition === undefined ? 0 : 100 - Number(attrition);
   return (
@@ -69,12 +105,12 @@ function RetentionGauge({ attrition }) {
         <RadialBarChart innerRadius="76%" outerRadius="100%" data={[{ value: retention }]} startAngle={220} endAngle={-40}>
           <defs>
             <linearGradient id="gauge-grad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#22d3ee" />
-              <stop offset="100%" stopColor="#a78bfa" />
+              <stop offset="0%" stopColor="#8ea3d6" />
+              <stop offset="100%" stopColor="#2c4a8c" />
             </linearGradient>
           </defs>
           <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-          <RadialBar dataKey="value" cornerRadius={20} fill="url(#gauge-grad)" background={{ fill: "rgba(255,255,255,0.06)" }} />
+          <RadialBar dataKey="value" cornerRadius={20} fill="url(#gauge-grad)" background={{ fill: "rgba(120,120,128,0.12)" }} />
         </RadialBarChart>
       </ResponsiveContainer>
       <div className="gauge-center">
@@ -112,18 +148,14 @@ export default function Overview() {
   return (
     <>
       {/* ---------- hero ---------- */}
-      <AnimatedContent trigger="mount" distance={30} duration={0.9} blur={8} className="hero glass">
+      <AnimatedContent trigger="mount" distance={20} duration={0.8} className="hero">
         <div className="hero-text">
           <div className="eyebrow"><Sparkles size={14} /> {greeting()}</div>
-          <div className="hero-title" role="heading" aria-level={1}>
-            <BlurText text="Your workforce," delay={110} direction="bottom" stepDuration={0.45} trigger="load" />
-            <AnimatedContent trigger="mount" delay={0.35} distance={18} blur={12} duration={0.9}>
-              <GradientText colors={["#a78bfa", "#22d3ee", "#f472b6"]} animationSpeed={6} glow={0.35}>
-                at a glance.
-              </GradientText>
-            </AnimatedContent>
-          </div>
-          <p className="muted hero-sub">
+          <h1 className="hero-title">
+            Your workforce.<br />
+            <span className="hero-title-2">At a glance.</span>
+          </h1>
+          <p className="hero-sub">
             Live analytics from PostgreSQL, with attrition risk predicted by machine learning.
           </p>
           <div className="insights">
@@ -131,9 +163,9 @@ export default function Overview() {
               <motion.div
                 key={ins.text}
                 className={`insight insight-${ins.tone}`}
-                initial={{ opacity: 0, x: -14 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 + i * 0.12 }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + i * 0.08, duration: 0.4 }}
               >
                 <span className="insight-dot" />
                 {ins.text}
@@ -157,6 +189,10 @@ export default function Overview() {
         <StatCard label="Pending leave" value={o?.pending_leave_requests} icon={CalendarClock} tone="violet" hint="awaiting approval" />
       </Reveal>
 
+      <Reveal delay={0.15}>
+        <GenderCard />
+      </Reveal>
+
       {/* ---------- attendance + risk ---------- */}
       <Reveal delay={0.2} className="grid two-one">
         <Card title="Attendance trend" subtitle="Daily attendance rate, last 30 working days">
@@ -167,7 +203,7 @@ export default function Overview() {
                 <CartesianGrid stroke={COLORS.grid} vertical={false} />
                 <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={24} />
                 <YAxis {...axisProps} unit="%" domain={[trendMin, 100]} />
-                <Tooltip {...tooltipProps} cursor={{ stroke: "rgba(34,211,238,0.4)" }}
+                <Tooltip {...tooltipProps} cursor={{ stroke: "rgba(0,113,227,0.3)" }}
                   formatter={(v, _n, p) => [`${v}%  (${p.payload.absent} absent, ${p.payload.late} late)`, "Attendance"]} />
                 <Area type="monotone" dataKey="attendance_rate_pct" stroke={COLORS.cyan} strokeWidth={2.5} fill="url(#grad-area)" animationDuration={1400} />
               </AreaChart>

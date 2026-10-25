@@ -14,6 +14,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (accuracy_score, confusion_matrix, f1_score,
@@ -58,8 +59,10 @@ TRAINING_QUERY = f"""
 # ---------------------------------------------------------------------------
 
 def _preprocessor():
+    # median-imputation lets employees added through the website with a partial profile still be scored
+    numeric = Pipeline([("impute", SimpleImputer(strategy="median")), ("scale", StandardScaler())])
     return ColumnTransformer([
-        ("num", StandardScaler(), NUMERIC_FEATURES),
+        ("num", numeric, NUMERIC_FEATURES),
         ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
     ])
 
@@ -116,6 +119,62 @@ def risk_level(score):
     return "LOW"
 
 
+def _features(df):
+    X = df[NUMERIC_FEATURES + CATEGORICAL_FEATURES].copy()
+    # PostgreSQL NUMERIC columns arrive as Python Decimals; the model needs plain floats
+    X[NUMERIC_FEATURES] = X[NUMERIC_FEATURES].astype(float)
+    X[CATEGORICAL_FEATURES] = X[CATEGORICAL_FEATURES].fillna("Unknown").astype(str)
+    return X
+
+
+def explain_contributions(pipeline, X):
+    """
+    Per-employee feature attribution for a logistic regression.
+    contribution = coefficient x (employee's value - average value), on the model's own scale,
+    so contributions add up to how far this person's log-odds sit from the average person's.
+    One-hot columns are summed back into their original feature (e.g. all job_role_* columns).
+    Returns, for every row of X, the factors pushing risk up and the ones pulling it down.
+    """
+    prep = pipeline.named_steps["prep"]
+    coef = pipeline.named_steps["model"].coef_[0]
+    Xt = prep.transform(X)
+    Xt = Xt.toarray() if hasattr(Xt, "toarray") else np.asarray(Xt)
+    contrib = (Xt - Xt.mean(axis=0)) * coef
+
+    names = [n.split("__", 1)[1] for n in prep.get_feature_names_out()]
+    original = []
+    for name in names:
+        match = max((f for f in CATEGORICAL_FEATURES if name.startswith(f + "_")), key=len, default=None)
+        original.append(match or name)
+    features = sorted(set(original))
+    index = {f: [i for i, o in enumerate(original) if o == f] for f in features}
+    grouped = np.column_stack([contrib[:, index[f]].sum(axis=1) for f in features])
+
+    out = []
+    for row in grouped:
+        order = np.argsort(-row)
+        up = [{"f": features[i], "c": round(float(row[i]), 3)} for i in order[:4] if row[i] > 0.05]
+        down = [{"f": features[i], "c": round(float(row[i]), 3)} for i in order[::-1][:3] if row[i] < -0.05]
+        out.append({"up": up, "down": down})
+    return out
+
+
+def calibration_table(y, scores, bins=8):
+    """
+    How often people with similar scores actually left (out-of-fold). This turns a raw model score
+    into an honest statement like "about 4 in 10 similar employees left".
+    """
+    edges = np.unique(np.quantile(scores, np.linspace(0, 1, bins + 1)))
+    table = []
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        mask = (scores >= lo) & (scores <= hi)
+        if mask.sum() == 0:
+            continue
+        table.append({"lo": round(float(lo), 4), "hi": round(float(hi), 4),
+                      "n": int(mask.sum()), "rate": round(float(y[mask].mean()), 4)})
+    return table
+
+
 def train(df):
     """
     Compares the candidate models with 5-fold cross-validation and picks the best by ROC-AUC.
@@ -123,9 +182,7 @@ def train(df):
     Every employee's risk score is an "out-of-fold" prediction: it comes from a model that
     never saw that employee during training, so the scores are honest, not memorised.
     """
-    X = df[NUMERIC_FEATURES + CATEGORICAL_FEATURES].copy()
-    # PostgreSQL NUMERIC columns arrive as Python Decimals; the model needs plain floats
-    X[NUMERIC_FEATURES] = X[NUMERIC_FEATURES].astype(float)
+    X = _features(df)
     y = df["attrition"].astype(int).to_numpy()
     folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
 
@@ -140,6 +197,14 @@ def train(df):
     best = results[best_name]
     final_model = best["pipeline"].fit(X, y)          # refit on all data for future use
 
+    # Explanations come from a logistic regression: exact when it is the chosen model,
+    # otherwise a linear "surrogate" fitted on the same data (clearly labelled as approximate).
+    if best_name == "Logistic Regression":
+        explainer, method = final_model, "exact (logistic regression contributions)"
+    else:
+        explainer = candidate_models()["Logistic Regression"].fit(X, y)
+        method = "approximate (linear surrogate of the " + best_name + ")"
+
     return {
         "model_name": best_name,
         "model": final_model,
@@ -147,6 +212,9 @@ def train(df):
         "metrics": best["metrics"],
         "comparison": {k: v["metrics"] for k, v in results.items()},
         "top_factors": _top_factors(final_model),
+        "contributions": explain_contributions(explainer, X),
+        "explanation_method": method,
+        "calibration": calibration_table(y, best["scores"]),
     }
 
 
@@ -154,34 +222,31 @@ def train(df):
 # Database I/O
 # ---------------------------------------------------------------------------
 
-def main():
+def run_training(engine, triggered_by=None, log=print):
+    """
+    Trains, scores every active employee and stores the results in ONE transaction:
+    the old predictions are replaced and a row is added to model_runs (the training history).
+    Used by the command line and by the admin's "Retrain model" button.
+    """
     from sqlalchemy import text
 
-    from backend.app.database import engine
-
-    print("Reading employee data from the database...")
+    log("Reading employee data from the database...")
     df = pd.read_sql(text(TRAINING_QUERY), engine)
-    print(f"  {len(df)} employees, {int(df['attrition'].sum())} of them left")
+    if df["attrition"].nunique() < 2:
+        raise ValueError("Need employees who stayed AND employees who left to train the model.")
+    log(f"  {len(df)} employees, {int(df['attrition'].sum())} of them left")
 
-    print("Training and comparing models (5-fold cross-validation)...")
+    log("Training and comparing models (5-fold cross-validation)...")
     result = train(df)
-    print(f"Best model: {result['model_name']}")
+    log(f"Best model: {result['model_name']}")
 
     df["risk_score"] = result["scores"]
+    df["explanation"] = [json.dumps(c) for c in result["contributions"]]
     active = df[df["status"] == "ACTIVE"]
     rows = [{"user_id": int(r.user_id), "risk_score": round(float(r.risk_score), 4),
-             "risk_level": risk_level(r.risk_score), "model_name": result["model_name"]}
+             "risk_level": risk_level(r.risk_score), "model_name": result["model_name"],
+             "explanation": r.explanation}
             for r in active.itertuples()]
-
-    with engine.begin() as conn:            # one transaction: old scores replaced all at once
-        conn.execute(text("TRUNCATE attrition_predictions"))
-        conn.execute(text("""
-            INSERT INTO attrition_predictions (user_id, risk_score, risk_level, model_name)
-            VALUES (:user_id, :risk_score, :risk_level, :model_name)
-        """), rows)
-
-    ARTIFACT_DIR.mkdir(exist_ok=True)
-    joblib.dump(result["model"], MODEL_PATH)
     levels = pd.Series([r["risk_level"] for r in rows]).value_counts().to_dict()
     info = {
         "model_name": result["model_name"],
@@ -194,15 +259,43 @@ def main():
         "top_factors": result["top_factors"],
         "active_employees_scored": len(rows),
         "risk_level_counts": {k: int(levels.get(k, 0)) for k in ("HIGH", "MEDIUM", "LOW")},
+        "explanation_method": result["explanation_method"],
+        "calibration": result["calibration"],
     }
-    METRICS_PATH.write_text(json.dumps(info, indent=2))
 
-    m = result["metrics"]
+    with engine.begin() as conn:            # one transaction: scores and history saved together
+        conn.execute(text("TRUNCATE attrition_predictions"))
+        if rows:
+            conn.execute(text("""
+                INSERT INTO attrition_predictions (user_id, risk_score, risk_level, model_name, explanation)
+                VALUES (:user_id, :risk_score, :risk_level, :model_name, CAST(:explanation AS JSONB))
+            """), rows)
+        conn.execute(text("""
+            INSERT INTO model_runs (model_name, training_rows, roc_auc, info, triggered_by)
+            VALUES (:model_name, :rows, :roc_auc, CAST(:info AS JSONB), :by)
+        """), {"model_name": info["model_name"], "rows": len(df), "roc_auc": info["metrics"]["roc_auc"],
+               "info": json.dumps(info), "by": triggered_by})
+
+    # local copies (handy offline); online the database copy is the one that counts
+    try:
+        ARTIFACT_DIR.mkdir(exist_ok=True)
+        joblib.dump(result["model"], MODEL_PATH)
+        METRICS_PATH.write_text(json.dumps(info, indent=2))
+    except OSError:
+        pass
+    return info
+
+
+def main():
+    from backend.app.database import engine
+
+    info = run_training(engine)
+    m = info["metrics"]
     print("\nDone!")
     print(f"  ROC-AUC {m['roc_auc']}  |  precision {m['precision']}  |  recall {m['recall']}  |  F1 {m['f1']}")
-    print(f"  Scored {len(rows)} active employees: {info['risk_level_counts']}")
+    print(f"  Scored {info['active_employees_scored']} active employees: {info['risk_level_counts']}")
     print("  Top risk factors:")
-    for f in result["top_factors"][:5]:
+    for f in info["top_factors"][:5]:
         print(f"    - {f['feature']} ({f.get('effect', 'importance ' + str(f.get('importance')))})")
 
 

@@ -31,6 +31,39 @@ class UserResponse(BaseModel):
     salary: Optional[float] = None
 
 
+class ProfileFields(BaseModel):
+    """HR attributes stored in employee_profiles. Ranges mirror the CHECK constraints in the database."""
+    age: Optional[int] = Field(default=None, ge=18, le=65)
+    gender: Optional[Literal["Male", "Female"]] = None
+    marital_status: Optional[Literal["Single", "Married", "Divorced"]] = None
+    education: Optional[int] = Field(default=None, ge=1, le=5)
+    education_field: Optional[str] = Field(default=None, max_length=30)
+    job_role: Optional[str] = Field(default=None, max_length=40)
+    job_level: Optional[int] = Field(default=None, ge=1, le=5)
+    business_travel: Optional[Literal["Non-Travel", "Travel_Rarely", "Travel_Frequently"]] = None
+    distance_from_home: Optional[int] = Field(default=None, ge=0)
+    monthly_income: Optional[float] = Field(default=None, gt=0)
+    percent_salary_hike: Optional[int] = Field(default=None, ge=0, le=100)
+    stock_option_level: Optional[int] = Field(default=None, ge=0, le=3)
+    overtime: Optional[bool] = None
+    job_satisfaction: Optional[int] = Field(default=None, ge=1, le=4)
+    environment_satisfaction: Optional[int] = Field(default=None, ge=1, le=4)
+    relationship_satisfaction: Optional[int] = Field(default=None, ge=1, le=4)
+    job_involvement: Optional[int] = Field(default=None, ge=1, le=4)
+    work_life_balance: Optional[int] = Field(default=None, ge=1, le=4)
+    num_companies_worked: Optional[int] = Field(default=None, ge=0)
+    total_working_years: Optional[int] = Field(default=None, ge=0)
+    training_times_last_year: Optional[int] = Field(default=None, ge=0)
+    years_at_company: Optional[int] = Field(default=None, ge=0)
+    years_in_current_role: Optional[int] = Field(default=None, ge=0)
+    years_since_last_promotion: Optional[int] = Field(default=None, ge=0)
+    years_with_curr_manager: Optional[int] = Field(default=None, ge=0)
+
+
+# fields the database requires when a profile row is created
+PROFILE_REQUIRED = ("age", "gender", "marital_status", "job_role", "job_level", "monthly_income")
+
+
 class UserCreate(BaseModel):
     first_name: str = Field(min_length=1, max_length=50)
     last_name: str = Field(min_length=1, max_length=50)
@@ -40,10 +73,14 @@ class UserCreate(BaseModel):
     department_id: Optional[int] = None
     manager_id: Optional[int] = None
     salary: Optional[float] = Field(default=None, gt=0)
+    profile: Optional[ProfileFields] = None      # optional HR profile, created in the same transaction
 
 
 class UserUpdate(BaseModel):
     """Only the fields sent are changed."""
+    first_name: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    last_name: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    email: Optional[EmailStr] = None
     role_id: Optional[Literal[1, 2, 3]] = None
     department_id: Optional[int] = None
     manager_id: Optional[int] = None
@@ -51,7 +88,32 @@ class UserUpdate(BaseModel):
     status: Optional[Literal["ACTIVE", "EXITED"]] = None
 
 
+class PasswordReset(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ReviewCreate(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    feedback: Optional[str] = Field(default=None, max_length=1000)
+    review_date: date
+
+
 # ---------- Departments ----------
+
+class DepartmentCreate(BaseModel):
+    department_name: str = Field(min_length=1, max_length=60)
+    budget: Optional[float] = Field(default=None, ge=0)
+
+
+class DepartmentUpdate(BaseModel):
+    department_name: Optional[str] = Field(default=None, min_length=1, max_length=60)
+    budget: Optional[float] = Field(default=None, ge=0)
+
 
 class DepartmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -74,7 +136,37 @@ class AttendanceResponse(BaseModel):
     status: str
 
 
+class AttendanceUpsert(BaseModel):
+    """Create or correct one day's attendance for one person (UNIQUE(user_id, date) makes it an upsert)."""
+    user_id: int
+    date: date
+    status: Literal["PRESENT", "LATE", "ABSENT", "ON_LEAVE"]
+    check_in: Optional[datetime] = None
+    check_out: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def check_times(self):
+        present = self.status in ("PRESENT", "LATE")
+        if present and self.check_in is None:
+            raise ValueError("PRESENT and LATE need a check-in time")
+        if not present and (self.check_in or self.check_out):
+            raise ValueError("ABSENT and ON_LEAVE can't have check-in or check-out times")
+        if self.check_in and self.check_out and self.check_out <= self.check_in:
+            raise ValueError("check-out must be after check-in")
+        return self
+
+
 # ---------- Leave ----------
+
+class LeaveTypeCreate(BaseModel):
+    type_name: str = Field(min_length=1, max_length=10)
+    max_days: int = Field(gt=0, le=365)
+
+
+class LeaveTypeUpdate(BaseModel):
+    type_name: Optional[str] = Field(default=None, min_length=1, max_length=10)
+    max_days: Optional[int] = Field(default=None, gt=0, le=365)
+
 
 class LeaveTypeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

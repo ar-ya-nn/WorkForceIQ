@@ -1,15 +1,16 @@
 from datetime import date
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from backend.app.auth import (ADMIN, EMPLOYEE, MANAGER, CurrentUser, department_scope,
                               ensure_can_view, get_current_user, require_roles)
-from backend.app.database import get_db
+from backend.app.database import db_error_message, get_db
 from backend.app.models import Attendance, User
-from backend.app.schemas import AttendanceResponse, Page
+from backend.app.schemas import AttendanceResponse, AttendanceUpsert, Page
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
@@ -73,3 +74,26 @@ def attendance_summary(
         OFFSET :skip LIMIT :limit
     """), params).mappings().all()
     return {"total": total, "skip": skip, "limit": limit, "items": [dict(r) for r in rows]}
+
+
+@router.put("/", response_model=AttendanceResponse)
+def record_attendance(data: AttendanceUpsert, db: Session = Depends(get_db),
+                      user: CurrentUser = Depends(require_roles(ADMIN, MANAGER))):
+    """
+    Records or corrects one person's attendance for one day. UNIQUE(user_id, date) lets us use
+    INSERT ... ON CONFLICT DO UPDATE (an "upsert"); the CHECK constraints still validate the row.
+    """
+    ensure_can_view(db, user, data.user_id)
+    try:
+        row = db.execute(text("""
+            INSERT INTO attendance (user_id, date, check_in, check_out, status)
+            VALUES (:user_id, :date, :check_in, :check_out, :status)
+            ON CONFLICT (user_id, date)
+            DO UPDATE SET check_in = EXCLUDED.check_in, check_out = EXCLUDED.check_out, status = EXCLUDED.status
+            RETURNING attendance_id
+        """), data.model_dump()).first()
+        db.commit()
+    except DBAPIError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=db_error_message(e))
+    return db.get(Attendance, row[0])

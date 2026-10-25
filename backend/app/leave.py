@@ -9,7 +9,8 @@ from backend.app.auth import (ADMIN, EMPLOYEE, MANAGER, CurrentUser, department_
                               ensure_can_view, get_current_user, require_roles)
 from backend.app.database import db_error_message, get_db
 from backend.app.models import LeaveRequest, LeaveType, User
-from backend.app.schemas import LeaveCreate, LeaveListItem, LeaveResponse, LeaveTypeResponse, Page
+from backend.app.schemas import (LeaveCreate, LeaveListItem, LeaveResponse, LeaveTypeCreate, LeaveTypeResponse,
+                                 LeaveTypeUpdate, Page)
 
 router = APIRouter(prefix="/leave", tags=["Leave"])
 
@@ -17,6 +18,40 @@ router = APIRouter(prefix="/leave", tags=["Leave"])
 @router.get("/types", response_model=List[LeaveTypeResponse])
 def list_leave_types(db: Session = Depends(get_db), _: CurrentUser = Depends(get_current_user)):
     return db.query(LeaveType).order_by(LeaveType.leave_type_id).all()
+
+
+@router.post("/types", response_model=LeaveTypeResponse, status_code=201)
+def create_leave_type(data: LeaveTypeCreate, db: Session = Depends(get_db),
+                      _: CurrentUser = Depends(require_roles(ADMIN))):
+    leave_type = LeaveType(type_name=data.type_name.upper(), max_days=data.max_days)
+    db.add(leave_type)
+    try:
+        db.commit()
+    except DBAPIError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=db_error_message(e))
+    db.refresh(leave_type)
+    return leave_type
+
+
+@router.patch("/types/{leave_type_id}", response_model=LeaveTypeResponse)
+def update_leave_type(leave_type_id: int, data: LeaveTypeUpdate, db: Session = Depends(get_db),
+                      _: CurrentUser = Depends(require_roles(ADMIN))):
+    leave_type = db.get(LeaveType, leave_type_id)
+    if leave_type is None:
+        raise HTTPException(status_code=404, detail="Leave type not found")
+    changes = data.model_dump(exclude_unset=True)
+    if changes.get("type_name"):
+        changes["type_name"] = changes["type_name"].upper()
+    for field, value in changes.items():
+        setattr(leave_type, field, value)
+    try:
+        db.commit()
+    except DBAPIError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=db_error_message(e))
+    db.refresh(leave_type)
+    return leave_type
 
 
 @router.get("/", response_model=Page[LeaveListItem])

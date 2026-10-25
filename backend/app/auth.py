@@ -20,17 +20,21 @@ from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
 from backend.app.models import Department, User
+from backend.app.schemas import PasswordChange
 
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-secret-change-me")
 JWT_ALGORITHM = "HS256"
 TOKEN_HOURS = 8
-DEMO_PASSWORD = "Password@123"
 
 ADMIN, MANAGER, EMPLOYEE = "ADMIN", "MANAGER", "EMPLOYEE"
 ROLE_NAMES = {1: ADMIN, 2: MANAGER, 3: EMPLOYEE}
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 bearer = HTTPBearer(auto_error=False)
+
+
+class GoogleLoginRequest(BaseModel):
+    credential: str          # the ID token Google gives the browser
 
 
 class LoginRequest(BaseModel):
@@ -148,27 +152,50 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     return {"access_token": _create_token(user), "token_type": "bearer", "user": _to_current_user(user, db)}
 
 
+@router.get("/config")
+def auth_config():
+    """Tells the login page whether "Sign in with Google" is available (and its public client ID)."""
+    return {"google_client_id": os.getenv("GOOGLE_CLIENT_ID") or None}
+
+
+@router.post("/google")
+def google_login(data: GoogleLoginRequest, db: Session = Depends(get_db)):
+    """
+    Google single sign-on. Google's signed ID token is verified on the server (signature, expiry,
+    audience = our client ID, verified email). Then the matching WorkForceIQ account is signed in.
+    Nobody can create an account this way: an admin must have added their email first.
+    """
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    if not client_id:
+        raise HTTPException(status_code=404, detail="Google sign-in is not set up on this server")
+    try:
+        from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token
+        info = id_token.verify_oauth2_token(data.credential, google_requests.Request(), client_id)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Google sign-in failed. Please try again.")
+    if not info.get("email_verified"):
+        raise HTTPException(status_code=401, detail="Your Google email address isn't verified")
+
+    email = info["email"].lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user is None or user.status != "ACTIVE":
+        raise HTTPException(status_code=403,
+                            detail=f"No active WorkForceIQ account uses {email}. Ask your administrator to add it.")
+    return {"access_token": _create_token(user), "token_type": "bearer", "user": _to_current_user(user, db)}
+
+
 @router.get("/me", response_model=CurrentUser)
 def me(user: CurrentUser = Depends(get_current_user)):
     return user
 
 
-@router.get("/demo-accounts")
-def demo_accounts(db: Session = Depends(get_db)):
-    """
-    Sample logins shown on the login page so evaluators can try each role.
-    Turn off by setting DEMO_ACCOUNTS=false in the environment.
-    """
-    if os.getenv("DEMO_ACCOUNTS", "true").lower() != "true":
-        return {"enabled": False, "accounts": []}
-
-    def pick(role_id, limit):
-        return (db.query(User).filter(User.role_id == role_id, User.status == "ACTIVE")
-                  .order_by(User.user_id).limit(limit).all())
-
-    accounts = []
-    for user in pick(1, 1) + pick(2, 3) + pick(3, 2):
-        info = _to_current_user(user, db)
-        accounts.append({"email": info.email, "name": info.name, "role": info.role,
-                         "department_name": info.department_name})
-    return {"enabled": True, "password": DEMO_PASSWORD, "accounts": accounts}
+@router.post("/change-password", status_code=204)
+def change_password(data: PasswordChange, db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(get_current_user)):
+    """Any logged-in user can change their own password (they must know the current one)."""
+    user = db.get(User, current.user_id)
+    if not bcrypt.checkpw(data.current_password.encode(), user.password_hash.encode()):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    user.password_hash = bcrypt.hashpw(data.new_password.encode(), bcrypt.gensalt()).decode()
+    db.commit()

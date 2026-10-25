@@ -2,32 +2,17 @@ import { X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect } from "react";
 import AnimatedContent from "./rb/AnimatedContent.jsx";
-import BlurText from "./rb/BlurText.jsx";
 import CountUp from "./rb/CountUp.jsx";
-import SpotlightCard from "./rb/SpotlightCard.jsx";
 
-// Official React Bits components live in ./rb (copied from reactbits.dev, unmodified).
-// The helpers below just give them consistent settings across the dashboard.
-
-const GLASS = {
-  "--spotlight-card-surface": "rgba(15, 17, 26, 0.86)",
-  "--spotlight-card-border": "rgba(255, 255, 255, 0.08)",
-  "--spotlight-card-shadow": "0 1px 0 rgba(255,255,255,0.05) inset, 0 20px 50px -20px rgba(0,0,0,0.6)",
-};
-
-const TONE_HEX = {
-  violet: "#a78bfa", green: "#34d399", red: "#fb7185",
-  amber: "#fbbf24", cyan: "#22d3ee", pink: "#f472b6",
-};
+// Subtle motion only (Apple style): sections fade up, numbers count up (React Bits AnimatedContent / CountUp).
 
 /** Section that slides in when it scrolls into view (React Bits AnimatedContent). */
 export function Reveal({ children, delay = 0, stagger = 0, className = "", ...rest }) {
   return (
     <AnimatedContent
-      distance={32}
-      duration={0.75}
-      ease="power3.out"
-      blur={4}
+      distance={20}
+      duration={0.7}
+      ease="power2.out"
       threshold={0.05}
       delay={delay}
       stagger={stagger}
@@ -41,26 +26,25 @@ export function Reveal({ children, delay = 0, stagger = 0, className = "", ...re
 
 export function PageHeader({ eyebrow, title, subtitle, children }) {
   return (
-    <div className="page-header">
+    <motion.div
+      className="page-header"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+    >
       <div>
         {eyebrow && <div className="eyebrow">{eyebrow}</div>}
-        <div className="page-title" role="heading" aria-level={1}>
-          <BlurText text={title} delay={90} direction="bottom" stepDuration={0.4} trigger="load" />
-        </div>
-        {subtitle && (
-          <motion.p className="muted" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}>
-            {subtitle}
-          </motion.p>
-        )}
+        <h1 className="page-title">{title}</h1>
+        {subtitle && <p>{subtitle}</p>}
       </div>
       {children && <div className="page-actions">{children}</div>}
-    </div>
+    </motion.div>
   );
 }
 
 export function Card({ title, subtitle, actions, children, className = "" }) {
   return (
-    <SpotlightCard className={`panel ${className}`} style={GLASS} spotlightColor="#c4b5fd" intensity={0.12} borderGlow={0.5} spotlightSize={320}>
+    <div className={`card ${className}`}>
       {(title || actions) && (
         <div className="card-head">
           <div>
@@ -71,33 +55,71 @@ export function Card({ title, subtitle, actions, children, className = "" }) {
         </div>
       )}
       {children}
-    </SpotlightCard>
+    </div>
   );
 }
 
-export function StatCard({ label, value, suffix = "", decimals, icon: Icon, tone = "violet", hint }) {
+export function StatCard({ label, value, suffix = "", decimals, icon: Icon, tone = "blue", hint }) {
   return (
-    <SpotlightCard
-      className={`stat tone-${tone}`}
-      style={GLASS}
-      spotlightColor={TONE_HEX[tone]}
-      intensity={0.2}
-      borderGlow={0.8}
-      spotlightSize={200}
-    >
+    <div className={`card stat tone-${tone}`}>
       <div className="stat-top">
         <span className="stat-label">{label}</span>
-        {Icon && <span className="stat-icon"><Icon size={17} /></span>}
+        {Icon && <span className="stat-icon"><Icon size={16} strokeWidth={2.2} /></span>}
       </div>
       <div className="stat-value">
         {value === null || value === undefined
           ? <span className="skeleton inline" />
-          : <CountUp to={Number(value)} separator="," decimals={decimals} duration={1.6} mode="roll" />}
+          : <CountUp to={Number(value)} separator="," decimals={decimals} duration={1.4} />}
         {suffix && <span className="stat-suffix">{suffix}</span>}
       </div>
       {hint && <div className="stat-hint">{hint}</div>}
-      <div className="stat-glow" />
-    </SpotlightCard>
+    </div>
+  );
+}
+
+/** iOS-style segmented control with a sliding white pill. */
+export function Segmented({ options, value, onChange, id = "seg" }) {
+  return (
+    <div className="segmented" role="tablist">
+      {options.map((o) => {
+        const opt = typeof o === "string" ? { value: o, label: o } : o;
+        const active = opt.value === value;
+        return (
+          <button key={String(opt.value)} type="button" role="tab" aria-selected={active}
+            className="segment" onClick={() => onChange(opt.value)}>
+            {active && <motion.span layoutId={`${id}-pill`} className="segment-pill"
+              transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
+            <span className="segment-label">{opt.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Centered sheet for forms (Apple style). */
+export function Modal({ open, onClose, title, wide = false, children }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div className="modal-backdrop" onMouseDown={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div
+            className={`modal ${wide ? "wide" : ""}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 380, damping: 34 }}
+          >
+            <div className="modal-head">
+              <h3>{title}</h3>
+              <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+            </div>
+            <div className="modal-body">{children}</div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -107,6 +129,7 @@ const BADGE_TONES = {
   PENDING: "amber", APPROVED: "green", REJECTED: "red",
   PRESENT: "green", LATE: "amber", ABSENT: "red", ON_LEAVE: "violet",
   INSERT: "green", UPDATE: "amber", DELETE: "red",
+  ADMIN: "blue", MANAGER: "violet", EMPLOYEE: "grey",
 };
 
 export function Badge({ value, label }) {
@@ -165,19 +188,21 @@ export function Toast({ toast, onClose }) {
     return () => clearTimeout(t);
   }, [toast, onClose]);
   return (
-    <AnimatePresence>
-      {toast && (
-        <motion.div
-          className={`toast toast-${toast.type}`}
-          initial={{ opacity: 0, y: 24, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 16, scale: 0.96 }}
-        >
-          <span>{toast.message}</span>
-          <button className="icon-btn" onClick={onClose}><X size={16} /></button>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <div className="toast-wrap">
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            className={`toast toast-${toast.type}`}
+            initial={{ opacity: 0, y: 20, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.97 }}
+          >
+            <span>{toast.message}</span>
+            <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -217,12 +242,13 @@ export function Field({ label, children }) {
 
 /** Shared gradient definitions for charts. Put <ChartGradients /> inside any Recharts chart. */
 export function ChartGradients() {
+  // all gradients are shades of the one accent colour
   const stops = {
-    violet: ["#a78bfa", "#6d28d9"],
-    cyan: ["#67e8f9", "#0891b2"],
-    pink: ["#f9a8d4", "#be185d"],
-    red: ["#fda4af", "#e11d48"],
-    green: ["#6ee7b7", "#059669"],
+    violet: ["#6f88c6", "#2c4a8c"],
+    cyan: ["#8ea3d6", "#4a68b0"],
+    pink: ["#7d93cc", "#34559c"],
+    red: ["#4a68b0", "#1c2f57"],
+    green: ["#d5def2", "#9fb1dc"],
   };
   return (
     <defs>
@@ -239,16 +265,16 @@ export function ChartGradients() {
         </linearGradient>
       ))}
       <linearGradient id="grad-area" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.45} />
-        <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
+        <stop offset="0%" stopColor="#2c4a8c" stopOpacity={0.2} />
+        <stop offset="100%" stopColor="#2c4a8c" stopOpacity={0} />
       </linearGradient>
     </defs>
   );
 }
 
 const AVATAR_GRADIENTS = [
-  ["#a78bfa", "#6d28d9"], ["#22d3ee", "#0e7490"], ["#f472b6", "#9d174d"],
-  ["#34d399", "#047857"], ["#fbbf24", "#b45309"], ["#fb7185", "#be123c"],
+  ["#6f88c6", "#2c4a8c"], ["#8ea3d6", "#4a68b0"], ["#5a76b8", "#1c2f57"],
+  ["#9fb1dc", "#5a76b8"], ["#7d93cc", "#34559c"], ["#b3c1e4", "#6f88c6"],
 ];
 
 /** Coloured circle with initials; the colour is stable for each name. */
@@ -257,7 +283,7 @@ export function Avatar({ name = "", size = 34 }) {
   const hash = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
   const [a, b] = AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
   return (
-    <span className="avatar" style={{ width: size, height: size, background: `linear-gradient(135deg, ${a}, ${b})`, fontSize: size * 0.38 }}>
+    <span className="avatar" style={{ width: size, height: size, background: `linear-gradient(180deg, ${a}, ${b})`, fontSize: size * 0.38 }}>
       {initials || "?"}
     </span>
   );

@@ -3,7 +3,7 @@
 -- Run this once on an empty database. Running it again wipes everything.
 -- =====================================================================
 
-DROP TABLE IF EXISTS attrition_predictions, audit_logs, performance_reviews, leave_requests, leave_types,
+DROP TABLE IF EXISTS model_runs, attrition_predictions, audit_logs, performance_reviews, leave_requests, leave_types,
                      attendance, employee_profiles, users, departments, roles CASCADE;
 DROP FUNCTION IF EXISTS fn_audit_log() CASCADE;
 DROP FUNCTION IF EXISTS fn_validate_leave_request() CASCADE;
@@ -154,15 +154,16 @@ CREATE INDEX idx_audit_table_time   ON audit_logs(table_name, timestamp);
 -- ---------------------------------------------------------------------
 
 -- 3a. Generic audit trigger. TG_ARGV[0] is the primary-key column of the table.
-CREATE FUNCTION fn_audit_log() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION fn_audit_log() RETURNS TRIGGER AS $$
 DECLARE
+    old_row JSONB;
+    new_row JSONB;
     row_data JSONB;
 BEGIN
-    IF TG_OP = 'DELETE' THEN
-        row_data := to_jsonb(OLD);
-    ELSE
-        row_data := to_jsonb(NEW);
-    END IF;
+    -- password hashes are removed before anything is written to the audit log
+    IF TG_OP IN ('UPDATE', 'DELETE') THEN old_row := to_jsonb(OLD) - 'password_hash'; END IF;
+    IF TG_OP IN ('INSERT', 'UPDATE') THEN new_row := to_jsonb(NEW) - 'password_hash'; END IF;
+    row_data := COALESCE(new_row, old_row);
 
     INSERT INTO audit_logs (table_name, record_id, user_id, action, old_data, new_data)
     VALUES (
@@ -170,8 +171,8 @@ BEGIN
         (row_data ->> TG_ARGV[0])::BIGINT,
         (row_data ->> 'user_id')::INT,
         TG_OP,
-        CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN to_jsonb(OLD) END,
-        CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN to_jsonb(NEW) END
+        old_row,
+        new_row
     );
 
     IF TG_OP = 'DELETE' THEN
@@ -179,7 +180,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE TRIGGER trg_audit_users
 AFTER INSERT OR UPDATE OR DELETE ON users
@@ -386,13 +387,26 @@ CREATE TABLE attrition_predictions (
     risk_score   NUMERIC(5,4) NOT NULL CHECK (risk_score BETWEEN 0 AND 1),
     risk_level   VARCHAR(6)   NOT NULL CHECK (risk_level IN ('LOW', 'MEDIUM', 'HIGH')),
     model_name   VARCHAR(40)  NOT NULL,
-    predicted_at TIMESTAMP    NOT NULL DEFAULT NOW()
+    predicted_at TIMESTAMP    NOT NULL DEFAULT NOW(),
+    explanation  JSONB        -- factors pushing this person's risk up / down (for explainable AI)
 );
 
 CREATE INDEX idx_predictions_level ON attrition_predictions(risk_level);
 
+-- History of every model training run (written by train_model.py and the admin "Retrain" button)
+CREATE TABLE IF NOT EXISTS model_runs (
+    run_id        SERIAL       PRIMARY KEY,
+    trained_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+    model_name    VARCHAR(40)  NOT NULL,
+    training_rows INT          NOT NULL CHECK (training_rows > 0),
+    roc_auc       NUMERIC(5,4) CHECK (roc_auc BETWEEN 0 AND 1),
+    info          JSONB        NOT NULL,
+    triggered_by  INT          REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+
 -- Risk scores joined with who the employee is, for the API and dashboard
-CREATE VIEW v_attrition_risk AS
+CREATE OR REPLACE VIEW v_attrition_risk AS
 SELECT ap.user_id,
        u.first_name || ' ' || u.last_name AS full_name,
        u.email,
@@ -409,7 +423,11 @@ SELECT ap.user_id,
        ap.risk_score,
        ap.risk_level,
        ap.model_name,
-       ap.predicted_at
+       ap.predicted_at,
+       p.gender,
+       p.age,
+       p.marital_status,
+       p.business_travel
 FROM attrition_predictions ap
 JOIN users u                  ON u.user_id = ap.user_id
 JOIN employee_profiles p      ON p.user_id = ap.user_id

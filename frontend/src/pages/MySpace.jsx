@@ -1,12 +1,45 @@
 import { CalendarCheck, CalendarDays, Clock, UserRound } from "lucide-react";
 import { useCallback, useState } from "react";
-import { fmt, useApi } from "../api.js";
+import { api, fmt, useApi } from "../api.js";
 import { ROLE_LABEL, useAuth } from "../auth.jsx";
-import { Avatar, Badge, Card, ErrorBox, Loading, PageHeader, Reveal, StatCard, Toast } from "../components/ui.jsx";
+import { Avatar, Badge, Card, ErrorBox, Field, Loading, PageHeader, Reveal, StatCard, Toast } from "../components/ui.jsx";
 import { ApplyForm } from "./Leave.jsx";
 
 const SCALE = { 1: "Low", 2: "Medium", 3: "High", 4: "Very high" };
 const days = (start, end) => Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
+
+function ChangePassword({ onDone }) {
+  const [form, setForm] = useState({ current_password: "", new_password: "", confirm: "" });
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const mismatch = form.confirm && form.confirm !== form.new_password;
+
+  const save = async (e) => {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    try {
+      await api.post("/auth/change-password", { current_password: form.current_password, new_password: form.new_password });
+      setForm({ current_password: "", new_password: "", confirm: "" });
+      onDone({ type: "success", message: "Password changed." });
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <Card title="Change password">
+      <form onSubmit={save}>
+        <div className="form-grid">
+          <Field label="Current password"><input type="password" autoComplete="current-password" value={form.current_password} onChange={set("current_password")} required /></Field>
+          <Field label="New password (min 8)"><input type="password" autoComplete="new-password" value={form.new_password} onChange={set("new_password")} required minLength={8} /></Field>
+          <Field label="Confirm new password"><input type="password" autoComplete="new-password" value={form.confirm} onChange={set("confirm")} required /></Field>
+          <button className="btn primary" disabled={busy || mismatch || form.new_password.length < 8}>{busy ? "Saving…" : "Change password"}</button>
+        </div>
+        {mismatch && <p className="small red">The new passwords don't match.</p>}
+        {error && <div style={{ marginTop: 12 }}><ErrorBox message={error} /></div>}
+      </form>
+    </Card>
+  );
+}
 
 export default function MySpace() {
   const { user } = useAuth();
@@ -21,6 +54,8 @@ export default function MySpace() {
 
   const typeName = Object.fromEntries((types.data ?? []).map((t) => [t.leave_type_id, t.type_name]));
   const d = me.data;
+  // system accounts (like the built-in admin) have no HR profile: no income, role, attendance...
+  const hasProfile = Boolean(d && d.job_role);
   const records = myAttendance.data?.items ?? [];
   const present = records.filter((r) => r.status === "PRESENT" || r.status === "LATE").length;
   const leaveLeft = (balance.data ?? []).reduce((sum, b) => sum + Number(b.days_remaining), 0);
@@ -37,13 +72,19 @@ export default function MySpace() {
 
       <Reveal delay={0.05} stagger={0.06} className="grid stats">
         <StatCard label="Leave days left" value={balance.data ? leaveLeft : null} icon={CalendarDays} tone="violet" hint="all types, this year" />
-        <StatCard label="Days present" value={myAttendance.data ? present : null} suffix={` / ${records.length}`} icon={CalendarCheck} tone="green" hint="last 10 records" />
-        <StatCard label="Years here" value={d ? d.years_at_company ?? 0 : null} icon={Clock} tone="cyan" />
-        <StatCard label="Job level" value={d ? d.job_level ?? 0 : null} icon={UserRound} tone="amber" hint={d?.job_role ?? ""} />
+        {(!d || hasProfile) && (
+          <>
+            <StatCard label="Days present" value={myAttendance.data ? present : null} suffix={` / ${records.length}`} icon={CalendarCheck} tone="green" hint="last 10 records" />
+            <StatCard label="Years here" value={d ? d.years_at_company ?? 0 : null} icon={Clock} tone="cyan" />
+            <StatCard label="Job level" value={d ? d.job_level ?? 0 : null} icon={UserRound} tone="amber" hint={d?.job_role ?? ""} />
+          </>
+        )}
       </Reveal>
 
       <Reveal delay={0.1} className="grid two">
-        <Card title="My profile">
+        <Card title="My profile" subtitle={d && !hasProfile
+          ? "This is a system account without an HR profile, so there's no income, attendance or job data. Company data is on Overview, Employees and Attrition Risk."
+          : undefined}>
           {me.loading ? <Loading rows={6} /> : me.error ? <ErrorBox message={me.error} /> : (
             <>
               <div className="drawer-profile">
@@ -129,6 +170,10 @@ export default function MySpace() {
             </table>
           )}
         </Card>
+      </Reveal>
+
+      <Reveal delay={0.25}>
+        <ChangePassword onDone={setToast} />
       </Reveal>
 
       <Toast toast={toast} onClose={closeToast} />

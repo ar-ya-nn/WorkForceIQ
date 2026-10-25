@@ -1,40 +1,65 @@
-import { ArrowRight, Lock, Mail, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowRight, Lock, Mail } from "lucide-react";
+import { motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api.js";
-import { ROLE_LABEL, useAuth } from "../auth.jsx";
-import BlurText from "../components/rb/BlurText.jsx";
-import ShinyText from "../components/rb/ShinyText.jsx";
-import SpotlightCard from "../components/rb/SpotlightCard.jsx";
-import { Badge } from "../components/ui.jsx";
+import { useAuth } from "../auth.jsx";
 
-const CARD_STYLE = {
-  "--spotlight-card-surface": "rgba(15, 17, 26, 0.9)",
-  "--spotlight-card-border": "rgba(255, 255, 255, 0.1)",
-  "--spotlight-card-shadow": "0 30px 80px -20px rgba(0,0,0,0.7)",
-};
-const ROLE_TONE = { ADMIN: "HIGH", MANAGER: "MEDIUM", EMPLOYEE: "LOW" };
+const GOOGLE_SCRIPT = "https://accounts.google.com/gsi/client";
+
+function loadGoogleScript() {
+  if (window.google?.accounts?.id) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${GOOGLE_SCRIPT}"]`);
+    const script = existing || document.createElement("script");
+    script.addEventListener("load", resolve);
+    script.addEventListener("error", reject);
+    if (!existing) { script.src = GOOGLE_SCRIPT; script.async = true; document.head.appendChild(script); }
+  });
+}
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
+  const googleSlot = useRef(null);
+  const [googleReady, setGoogleReady] = useState(false);
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [demo, setDemo] = useState(null);
 
+  const goHome = (user) => navigate(user.role === "EMPLOYEE" ? "/me" : "/", { replace: true });
+
+  // Show "Sign in with Google" only if the server has a Google client ID configured
   useEffect(() => {
-    api.get("/auth/demo-accounts").then(setDemo).catch(() => setDemo(null));
-  }, []);
+    let cancelled = false;
+    api.get("/auth/config").then(async ({ google_client_id: clientId }) => {
+      if (!clientId || cancelled) return;
+      await loadGoogleScript();
+      if (cancelled || !googleSlot.current) return;
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: async ({ credential }) => {
+          setBusy(true); setError(null);
+          try { goHome(await loginWithGoogle(credential)); }
+          catch (err) { setError(err.message); }
+          finally { setBusy(false); }
+        },
+      });
+      window.google.accounts.id.renderButton(googleSlot.current, {
+        theme: "outline", size: "large", shape: "pill", text: "signin_with", width: 336,
+      });
+      setGoogleReady(true);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const user = await login(email, password);
-      navigate(user.role === "EMPLOYEE" ? "/me" : "/", { replace: true });
+      goHome(await login(email, password));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -42,71 +67,49 @@ export default function Login() {
     }
   };
 
-  const fill = (account) => {
-    setEmail(account.email);
-    setPassword(demo.password);
-    setError(null);
-  };
-
   return (
     <div className="login-page">
-      <div className="login-intro">
-        <div className="brand">
-          <div className="brand-mark">W</div>
-          <div>
-            <ShinyText text="WorkForceIQ" color="#cfd2ff" shineColor="#ffffff" speed={3} className="brand-name" />
-            <div className="brand-sub">HR Analytics</div>
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 26 }}
+      >
+        <div className="brand-mark login-mark">W</div>
+        <h1 className="login-title">Sign in to WorkForceIQ</h1>
+        <p className="login-sub">Workforce analytics for your organisation.</p>
+
+        <div className="card login-card">
+          <form onSubmit={submit} className="login-form">
+            <label className="field">
+              <span>Email</span>
+              <div className="input-icon">
+                <Mail size={16} />
+                <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@company.com" required autoFocus />
+              </div>
+            </label>
+            <label className="field">
+              <span>Password</span>
+              <div className="input-icon">
+                <Lock size={16} />
+                <input type="password" autoComplete="current-password" value={password}
+                  onChange={(e) => setPassword(e.target.value)} placeholder="Password" required />
+              </div>
+            </label>
+            {error && <div className="login-error">{error}</div>}
+            <button className="btn primary login-btn" disabled={busy}>
+              {busy ? "Signing in…" : <>Sign in <ArrowRight size={16} /></>}
+            </button>
+          </form>
+          <div style={{ display: googleReady ? "block" : "none" }}>
+            <div className="login-divider">or</div>
+            <div className="google-slot" ref={googleSlot} />
           </div>
         </div>
-        <div className="login-title" role="heading" aria-level={1}>
-          <BlurText text="Sign in to your workspace" delay={90} direction="bottom" trigger="load" />
-        </div>
-        <p className="muted">
-          Access depends on your role: admins see everything, managers see their department,
-          employees see their own records.
-        </p>
-      </div>
 
-      <SpotlightCard className="login-card" style={CARD_STYLE} spotlightColor="#c4b5fd" intensity={0.14} borderGlow={0.6}>
-        <form onSubmit={submit} className="login-form">
-          <label className="field">
-            <span className="muted small">Email</span>
-            <div className="input-icon">
-              <Mail size={16} />
-              <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@workforceiq.com" required />
-            </div>
-          </label>
-          <label className="field">
-            <span className="muted small">Password</span>
-            <div className="input-icon">
-              <Lock size={16} />
-              <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
-            </div>
-          </label>
-          {error && <div className="login-error">{error}</div>}
-          <button className="btn primary login-btn" disabled={busy}>
-            {busy ? "Signing in…" : <>Sign in <ArrowRight size={16} /></>}
-          </button>
-        </form>
-
-        {demo?.enabled && demo.accounts.length > 0 && (
-          <div className="demo-accounts">
-            <div className="demo-head">
-              <ShieldCheck size={15} />
-              <span>Demo accounts · password <code>{demo.password}</code></span>
-            </div>
-            {demo.accounts.map((a) => (
-              <button key={a.email} type="button" className="demo-account" onClick={() => fill(a)}>
-                <div>
-                  <div className="person-name">{a.name}</div>
-                  <div className="muted small">{a.email}{a.department_name ? ` · ${a.department_name}` : ""}</div>
-                </div>
-                <Badge value={ROLE_TONE[a.role]} label={ROLE_LABEL[a.role]} />
-              </button>
-            ))}
-          </div>
-        )}
-      </SpotlightCard>
+        <p className="login-foot">Forgot your password? Ask your administrator to reset it.</p>
+      </motion.div>
     </div>
   );
 }
