@@ -1,6 +1,7 @@
-import { CalendarClock, Clock, ShieldAlert, Sparkles, TrendingDown, UserCheck, Users, Wallet } from "lucide-react";
+import { ArrowRight, CalendarClock, Clock, ShieldAlert, Sparkles, TrendingDown, UserCheck, Users, Wallet } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, PolarAngleAxis,
   RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -97,6 +98,47 @@ function GenderCard() {
   );
 }
 
+/** Plain-language briefing written from live data and the ML model (see backend/app/briefing.py). */
+function Briefing() {
+  const b = useApi("/analytics/briefing");
+  const navigate = useNavigate();
+  if (b.loading) return <Card><ChartLoading /></Card>;
+  if (b.error) return <ErrorBox message={b.error} />;
+  const x = b.data;
+  const Section = ({ title, children }) => <div className="brief-section"><h4>{title}</h4>{children}</div>;
+  const Item = ({ item }) => (
+    <li>
+      <span>{item.text}</span>
+      {item.link && <button className="btn ghost small" onClick={() => navigate(item.link)}>{item.cta} <ArrowRight size={14} /></button>}
+    </li>
+  );
+  return (
+    <Card className="briefing">
+      <div className="brief-head">
+        <span className="brief-badge"><Sparkles size={14} /> AI briefing</span>
+        <span className="muted small">Updated {new Date(x.generated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
+      </div>
+      <h2 className="brief-headline">{x.headline}</h2>
+      {x.big_picture.map((t) => <p key={t} className="brief-lead">{t}</p>)}
+      <div className="brief-grid">
+        {x.drivers.length > 0 && (
+          <Section title="What's driving it">
+            <ul className="brief-list">{x.drivers.map((t) => <li key={t}><span>{t}</span></li>)}</ul>
+          </Section>
+        )}
+        {(x.focus.length > 0 || x.todos.length > 0) && (
+          <Section title="Where to look next">
+            <ul className="brief-list">
+              {[...x.focus, ...x.todos].map((item) => <Item key={item.text} item={item} />)}
+            </ul>
+          </Section>
+        )}
+      </div>
+      <p className="xai-note">{x.basis}</p>
+    </Card>
+  );
+}
+
 function RetentionGauge({ attrition }) {
   const retention = attrition === undefined ? 0 : 100 - Number(attrition);
   return (
@@ -129,6 +171,7 @@ export default function Overview() {
   const overtime = useApi("/analytics/attrition/by/overtime");
   const trend = useApi("/analytics/attendance-trend");
   const [factor, setFactor] = useState("overtime");
+  const [showNumbers, setShowNumbers] = useState(false);
   const byFactor = useApi(`/analytics/attrition/by/${factor}`);
 
   const o = overview.data;
@@ -178,8 +221,18 @@ export default function Overview() {
 
       {overview.error && <ErrorBox message={overview.error} />}
 
-      {/* ---------- KPIs ---------- */}
-      <Reveal delay={0.1} stagger={0.06} className="grid stats">
+      {/* ---------- AI briefing (replaces the number tiles; numbers on request) ---------- */}
+      <Reveal delay={0.1}>
+        <Briefing />
+      </Reveal>
+
+      <div>
+        <button className="link small" onClick={() => setShowNumbers((v) => !v)}>
+          {showNumbers ? "Hide the numbers" : "Show the numbers"}
+        </button>
+      </div>
+      {showNumbers && (
+      <Reveal stagger={0.05} className="grid stats">
         <StatCard label="Total employees" value={o?.total_employees} icon={Users} hint="in the database" />
         <StatCard label="Active" value={o?.active_employees} icon={UserCheck} tone="green" hint={o ? `${o.employees_left} have left` : ""} />
         <StatCard label="Attrition rate" value={o?.attrition_rate_pct} suffix="%" decimals={1} icon={TrendingDown} tone="red" hint="all-time" />
@@ -188,6 +241,7 @@ export default function Overview() {
         <StatCard label="Avg monthly income" value={o?.avg_monthly_income} decimals={0} icon={Wallet} tone="cyan" />
         <StatCard label="Pending leave" value={o?.pending_leave_requests} icon={CalendarClock} tone="violet" hint="awaiting approval" />
       </Reveal>
+      )}
 
       <Reveal delay={0.15}>
         <GenderCard />

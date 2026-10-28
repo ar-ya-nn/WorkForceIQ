@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from backend.app.analytics import router as analytics_router
 from backend.app.attendance import router as attendance_router
 from backend.app.auth import router as auth_router
+from backend.app.briefing import router as briefing_router
 from backend.app.audit import router as audit_router
 from backend.app.database import get_db
 from backend.app.departments import router as departments_router
@@ -33,6 +34,7 @@ app.include_router(departments_router)
 app.include_router(attendance_router)
 app.include_router(leave_router)
 app.include_router(analytics_router)
+app.include_router(briefing_router)
 app.include_router(audit_router)
 app.include_router(predictions_router)
 
