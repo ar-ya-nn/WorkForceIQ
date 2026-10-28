@@ -22,6 +22,11 @@ function GoogleMark() {
 
 export default function Login() {
   const { login, loginWithGoogle } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
   const [googleClientId, setGoogleClientId] = useState(null);
 
   const goHome = (user) => navigate(user.role === "EMPLOYEE" ? "/me" : "/", { replace: true });
