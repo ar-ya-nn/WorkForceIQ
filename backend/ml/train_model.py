@@ -159,6 +159,32 @@ def explain_contributions(pipeline, X):
     return out
 
 
+def export_linear(pipeline):
+    """
+    Exports a fitted logistic-regression pipeline as plain numbers (JSON) so it can be stored in
+    the database and scored anywhere without scikit-learn: medians for missing values, the
+    standardisation, one weight per numeric feature and per category, and the intercept.
+    """
+    prep = pipeline.named_steps["prep"]
+    model = pipeline.named_steps["model"]
+    num = prep.named_transformers_["num"]
+    medians = num.named_steps["impute"].statistics_
+    scaler = num.named_steps["scale"]
+    ohe = prep.named_transformers_["cat"]
+    coef = model.coef_[0]
+
+    numeric = []
+    for i, name in enumerate(NUMERIC_FEATURES):
+        numeric.append({"name": name, "median": float(medians[i]), "mean": float(scaler.mean_[i]),
+                        "scale": float(scaler.scale_[i]) or 1.0, "coef": float(coef[i])})
+    categorical, pos = [], len(NUMERIC_FEATURES)
+    for name, cats in zip(CATEGORICAL_FEATURES, ohe.categories_):
+        weights = {str(c): float(coef[pos + j]) for j, c in enumerate(cats)}
+        categorical.append({"name": name, "weights": weights})
+        pos += len(cats)
+    return {"intercept": float(model.intercept_[0]), "numeric": numeric, "categorical": categorical}
+
+
 def calibration_table(y, scores, bins=8):
     """
     How often people with similar scores actually left (out-of-fold). This turns a raw model score
@@ -213,6 +239,7 @@ def train(df):
         "comparison": {k: v["metrics"] for k, v in results.items()},
         "top_factors": _top_factors(final_model),
         "contributions": explain_contributions(explainer, X),
+        "linear_model": export_linear(explainer),
         "explanation_method": method,
         "calibration": calibration_table(y, best["scores"]),
     }
@@ -261,6 +288,7 @@ def run_training(engine, triggered_by=None, log=print):
         "risk_level_counts": {k: int(levels.get(k, 0)) for k in ("HIGH", "MEDIUM", "LOW")},
         "explanation_method": result["explanation_method"],
         "calibration": result["calibration"],
+        "linear_model": result["linear_model"],      # used by the retention planner (what-if scoring)
     }
 
     with engine.begin() as conn:            # one transaction: scores and history saved together

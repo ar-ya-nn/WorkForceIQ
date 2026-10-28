@@ -5,6 +5,7 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from backend.app.auth import (ADMIN, MANAGER, CurrentUser, department_scope, ensure_can_view,
@@ -97,8 +98,16 @@ def _profiles_and_factors(db: Session, user_ids):
 
 
 def _add_main_reasons(db: Session, rows):
-    """Adds 'main_reason' (a short sentence from the explainable-AI factors) to each row."""
-    profiles, factors = _profiles_and_factors(db, [r["user_id"] for r in rows])
+    """
+    Adds 'main_reason' (a short sentence from the explainable-AI factors) to each row.
+    If explanations aren't available yet (update_v3.sql not run, or the model not retrained),
+    the list still loads and the reason is simply left empty.
+    """
+    try:
+        profiles, factors = _profiles_and_factors(db, [r["user_id"] for r in rows])
+    except DBAPIError:
+        db.rollback()
+        profiles, factors = {}, {}
     for r in rows:
         r["main_reason"] = short_reason(factors.get(r["user_id"]), profiles.get(r["user_id"], {}))
 
@@ -253,7 +262,12 @@ def explain_prediction(user_id: int, db: Session = Depends(get_db),
     if pred is None:
         raise HTTPException(status_code=404, detail="Only active employees with a profile are scored")
 
-    profiles, factors = _profiles_and_factors(db, [user_id])
+    try:
+        profiles, factors = _profiles_and_factors(db, [user_id])
+    except DBAPIError:
+        db.rollback()
+        raise HTTPException(status_code=409,
+                            detail="Explanations aren't set up yet: run database/update_v3.sql, then retrain the model.")
     averages = dict(db.execute(text("""
         SELECT AVG(monthly_income) AS monthly_income, AVG(distance_from_home) AS distance_from_home
         FROM employee_profiles
