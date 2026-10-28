@@ -34,7 +34,8 @@ bearer = HTTPBearer(auto_error=False)
 
 
 class GoogleLoginRequest(BaseModel):
-    credential: str          # the ID token Google gives the browser
+    credential: str                  # the ID token Google gives the browser
+    nonce: Optional[str] = None      # random value our page sent to Google; must come back inside the token
 
 
 class LoginRequest(BaseModel):
@@ -174,6 +175,8 @@ def google_login(data: GoogleLoginRequest, db: Session = Depends(get_db)):
         info = id_token.verify_oauth2_token(data.credential, google_requests.Request(), client_id)
     except ValueError:
         raise HTTPException(status_code=401, detail="Google sign-in failed. Please try again.")
+    if data.nonce and info.get("nonce") != data.nonce:
+        raise HTTPException(status_code=401, detail="Google sign-in failed (security check). Please try again.")
     if not info.get("email_verified"):
         raise HTTPException(status_code=401, detail="Your Google email address isn't verified")
 

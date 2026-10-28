@@ -38,7 +38,7 @@ export function AuthProvider({ children }) {
   };
   const login = async (email, password) => finish(await api.post("/auth/login", { email, password }));
   // Google single sign-on: the backend verifies Google's ID token, then signs in the matching account
-  const loginWithGoogle = async (credential) => finish(await api.post("/auth/google", { credential }));
+  const loginWithGoogle = async (credential, nonce) => finish(await api.post("/auth/google", { credential, nonce }));
 
   return (
     <AuthContext.Provider value={{ user, checking, login, loginWithGoogle, logout }}>

@@ -739,3 +739,10 @@ select:focus, input:focus, textarea:focus, .search:focus-within, .input-icon:foc
 .login-divider { display: flex; align-items: center; gap: 12px; color: var(--text-3); font-size: 13px; margin: 6px 0 2px; }
 .login-divider::before, .login-divider::after { content: ""; flex: 1; height: 1px; background: rgba(60, 60, 67, 0.15); }
 .google-slot { display: flex; justify-content: center; min-height: 44px; }
+
+/* ---------- site logo (frontend/public/logo.svg; replace that file to change it everywhere) ---------- */
+.brand-logo { width: 34px; height: 34px; border-radius: 9px; display: block; object-fit: contain; flex-shrink: 0;
+  box-shadow: 0 4px 12px -4px rgba(28, 47, 87, 0.45); }
+.login-logo { width: 64px; height: 64px; border-radius: 16px; box-shadow: 0 12px 30px -8px rgba(28, 47, 87, 0.5); }
+.splash-logo { width: 56px; height: 56px; border-radius: 14px; animation: pulse-mark 0.9s ease-in-out infinite alternate; }
+.google-btn { width: 100%; padding: 11px 18px; gap: 10px; font-size: 15px; background: rgba(255, 255, 255, 0.85); }

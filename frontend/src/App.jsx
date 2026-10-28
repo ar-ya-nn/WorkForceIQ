@@ -42,7 +42,7 @@ function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">W</div>
+        <img src="/logo.svg" alt="" className="brand-logo" />
         <div>
           <div className="brand-name">WorkForceIQ</div>
           <div className="brand-sub">Workforce analytics</div>
@@ -123,7 +123,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [user]);
 
-  if (checking) return <div className="splash"><div className="brand-mark">W</div></div>;
+  if (checking) return <div className="splash"><img src="/logo.svg" alt="WorkForceIQ" className="brand-logo splash-logo" /></div>;
   if (!user) return <Login />;
 
   const home = user.role === "EMPLOYEE" ? "/me" : "/";

@@ -1,14 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="WorkForceIQ">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#5b79c2"/><stop offset="0.55" stop-color="#2c4a8c"/><stop offset="1" stop-color="#16264a"/></linearGradient>
-    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.42"/><stop offset="0.45" stop-color="#fff" stop-opacity="0.06"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
-    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.75"/><stop offset="0.45" stop-color="#fff" stop-opacity="0.08"/><stop offset="1" stop-color="#fff" stop-opacity="0.35"/></linearGradient>
-    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#cfe0ff" stop-opacity="0.9"/><stop offset="1" stop-color="#cfe0ff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a78c0"/>
+      <stop offset="1" stop-color="#1c2f57"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
   </defs>
   <rect width="64" height="64" rx="15" fill="url(#bg)"/>
-  <path d="M15 1h34a14 14 0 0 1 14 14v8C48 30 22 30 1 22v-7A14 14 0 0 1 15 1z" fill="url(#shine)"/>
-  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="14.3" fill="none" stroke="url(#rim)" stroke-width="1.5"/>
-  <circle cx="30" cy="34" r="17" fill="#fff" fill-opacity="0.14" stroke="#fff" stroke-opacity="0.85" stroke-width="3"/>
-  <path d="M21.5 28 L25.5 41 L30 32.5 L34.5 41 L38.5 28" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M49 9 C49.6 13.2 50.8 14.4 55 15 C50.8 15.6 49.6 16.8 49 21 C48.4 16.8 47.2 15.6 43 15 C47.2 14.4 48.4 13.2 49 9 Z" fill="#fff"/>
+  <rect width="64" height="64" rx="15" fill="url(#shine)"/>
+  <!-- three rising bars: people + growth -->
+  <rect x="15" y="34" width="8" height="15" rx="3" fill="#ffffff" fill-opacity="0.7"/>
+  <rect x="28" y="26" width="8" height="23" rx="3" fill="#ffffff" fill-opacity="0.85"/>
+  <rect x="41" y="18" width="8" height="31" rx="3" fill="#ffffff"/>
+  <circle cx="45" cy="11.5" r="3.5" fill="#ffffff"/>
 </svg>
