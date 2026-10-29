@@ -23,3 +23,11 @@ The official CountUp uses the `motion` package, which is already in package.json
 - Check the corresponding CSS file when updating a component's appearance.
 - Verify animations and responsive layouts after making UI changes.
 - Confirm that required dependencies are installed before replacing components.
+
+## Accessibility and Configuration
+
+- Respect reduced-motion preferences for animated components.
+- Validate animation duration and speed values.
+- Keep component props and documentation consistent.
+- Test components with default and custom props.
+- Verify animations and visual effects after UI changes.
