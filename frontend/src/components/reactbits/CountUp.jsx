@@ -1,37 +1,80 @@
+
 import { useEffect, useRef, useState } from "react";
 
-/** Counts from `from` to `to` when it scrolls into view. Props match React Bits' CountUp. */
-export default function CountUp({ to, from = 0, duration = 1.5, separator = "", className = "", decimals }) {
+/** Counts from `from` to `to` when it scrolls into view. */
+export default function CountUp({
+  to,
+  from = 0,
+  duration = 1.5,
+  separator = "",
+  className = "",
+  decimals,
+}) {
   const [value, setValue] = useState(from);
   const ref = useRef(null);
-  const places = decimals ?? (String(to).includes(".") ? Math.min(String(to).split(".")[1].length, 2) : 0);
+
+  const places =
+    decimals ??
+    (String(to).includes(".")
+      ? Math.min(String(to).split(".")[1].length, 2)
+      : 0);
 
   useEffect(() => {
     const node = ref.current;
-    let frame;
+    const durationMs = Number(duration) * 1000;
+    let frame = null;
+    let observer;
+
+    const prefersReducedMotion =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ??
+      false;
+
+    // Skip animation for reduced motion or invalid durations.
+    if (
+      prefersReducedMotion ||
+      !Number.isFinite(durationMs) ||
+      durationMs <= 0
+    ) {
+      setValue(to);
+      return;
+    }
+
     let started = false;
 
     const run = () => {
       const start = performance.now();
+
       const tick = (now) => {
-        const t = Math.min((now - start) / (duration * 1000), 1);
-        const eased = 1 - Math.pow(1 - t, 3);
+        const progress = Math.min((now - start) / durationMs, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+
         setValue(from + (to - from) * eased);
-        if (t < 1) frame = requestAnimationFrame(tick);
+
+        if (progress < 1) {
+          frame = requestAnimationFrame(tick);
+        }
       };
+
       frame = requestAnimationFrame(tick);
     };
 
-    const observer = new IntersectionObserver(([entry]) => {
+    observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting && !started) {
         started = true;
         run();
       }
     });
-    if (node) observer.observe(node);
+
+    if (node) {
+      observer.observe(node);
+    }
+
     return () => {
-      observer.disconnect();
-      cancelAnimationFrame(frame);
+      observer?.disconnect();
+
+      if (frame !== null) {
+        cancelAnimationFrame(frame);
+      }
     };
   }, [to, from, duration]);
 
@@ -43,7 +86,9 @@ export default function CountUp({ to, from = 0, duration = 1.5, separator = "", 
 
   return (
     <span ref={ref} className={className}>
-      {separator && separator !== "," ? text.replace(/,/g, separator) : text}
+      {separator && separator !== ","
+        ? text.replace(/,/g, separator)
+        : text}
     </span>
   );
 }

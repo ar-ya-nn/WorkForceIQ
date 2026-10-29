@@ -33,3 +33,11 @@
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+
+
+@media (prefers-reduced-motion: reduce) {
+  .gradient-text {
+    animation: none;
+    transition: none;
+  }
+}
