@@ -15,3 +15,11 @@ dashboard works straight away. To use the official React Bits code instead:
 | GradientText  | Text Animations -> Gradient Text | page titles           |
 
 The official CountUp uses the `motion` package, which is already in package.json.
+
+
+## Maintenance and Testing
+
+- Keep component props consistent with their usage across the dashboard.
+- Check the corresponding CSS file when updating a component's appearance.
+- Verify animations and responsive layouts after making UI changes.
+- Confirm that required dependencies are installed before replacing components.
