@@ -1,7 +1,15 @@
+
 from datetime import date, datetime
 from typing import Any, Generic, List, Literal, Optional, TypeVar
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 T = TypeVar("T")
 
@@ -60,8 +68,15 @@ class ProfileFields(BaseModel):
     years_with_curr_manager: Optional[int] = Field(default=None, ge=0)
 
 
-# fields the database requires when a profile row is created
-PROFILE_REQUIRED = ("age", "gender", "marital_status", "job_role", "job_level", "monthly_income")
+# Fields the database requires when a profile row is created
+PROFILE_REQUIRED = (
+    "age",
+    "gender",
+    "marital_status",
+    "job_role",
+    "job_level",
+    "monthly_income",
+)
 
 
 class UserCreate(BaseModel):
@@ -73,7 +88,15 @@ class UserCreate(BaseModel):
     department_id: Optional[int] = None
     manager_id: Optional[int] = None
     salary: Optional[float] = Field(default=None, gt=0)
-    profile: Optional[ProfileFields] = None      # optional HR profile, created in the same transaction
+    profile: Optional[ProfileFields] = None
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def validate_names(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Name cannot be empty or whitespace")
+        return value
 
 
 class UserUpdate(BaseModel):
@@ -86,6 +109,17 @@ class UserUpdate(BaseModel):
     manager_id: Optional[int] = None
     salary: Optional[float] = Field(default=None, gt=0)
     status: Optional[Literal["ACTIVE", "EXITED"]] = None
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def validate_names(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+
+        value = value.strip()
+        if not value:
+            raise ValueError("Name cannot be empty or whitespace")
+        return value
 
 
 class PasswordReset(BaseModel):
@@ -137,7 +171,7 @@ class AttendanceResponse(BaseModel):
 
 
 class AttendanceUpsert(BaseModel):
-    """Create or correct one day's attendance for one person (UNIQUE(user_id, date) makes it an upsert)."""
+    """Create or correct one day's attendance for one person."""
     user_id: int
     date: date
     status: Literal["PRESENT", "LATE", "ABSENT", "ON_LEAVE"]
@@ -147,12 +181,20 @@ class AttendanceUpsert(BaseModel):
     @model_validator(mode="after")
     def check_times(self):
         present = self.status in ("PRESENT", "LATE")
+
         if present and self.check_in is None:
             raise ValueError("PRESENT and LATE need a check-in time")
-        if not present and (self.check_in or self.check_out):
+
+        if not present and (self.check_in is not None or self.check_out is not None):
             raise ValueError("ABSENT and ON_LEAVE can't have check-in or check-out times")
-        if self.check_in and self.check_out and self.check_out <= self.check_in:
+
+        if (
+            self.check_in is not None
+            and self.check_out is not None
+            and self.check_out <= self.check_in
+        ):
             raise ValueError("check-out must be after check-in")
+
         return self
 
 
@@ -195,7 +237,7 @@ class LeaveListItem(LeaveResponse):
 
 
 class LeaveCreate(BaseModel):
-    user_id: Optional[int] = None      # left out = "for myself"; employees are always forced to themselves
+    user_id: Optional[int] = None
     leave_type_id: int
     start_date: date
     end_date: date
@@ -222,8 +264,6 @@ class ReviewResponse(BaseModel):
 
 
 class AuditLogResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     log_id: int
     table_name: str
     record_id: Optional[int] = None

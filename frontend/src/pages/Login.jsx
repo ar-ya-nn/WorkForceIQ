@@ -69,12 +69,22 @@ export default function Login() {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (busy) return;
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+    setError("Please enter your email address.");
+    return;
+  }
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      goHome(await login(email, password));
+      goHome(await login(normalizedEmail, password));
     } catch (err) {
-      setError(err.message);
+      setError(err?.message || "Sign-in failed. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -98,8 +108,7 @@ export default function Login() {
               <span>Email</span>
               <div className="input-icon">
                 <Mail size={16} />
-                <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.com" required autoFocus />
+                <input type="email" autoComplete="username" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} placeholder="name@company.com" required autoFocus />
               </div>
             </label>
             <label className="field">
@@ -107,7 +116,7 @@ export default function Login() {
               <div className="input-icon">
                 <Lock size={16} />
                 <input type="password" autoComplete="current-password" value={password}
-                  onChange={(e) => setPassword(e.target.value)} placeholder="Password" required />
+                  onChange={(e) => { setPassword(e.target.value); setError(null); }} placeholder="Password" required />
               </div>
             </label>
             {error && <div className="login-error">{error}</div>}
