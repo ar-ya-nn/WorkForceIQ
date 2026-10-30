@@ -12,6 +12,7 @@ export default function CommandPalette({ open, onClose, onOpenEmployee }) {
   const [people, setPeople] = useState([]);
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
+  const resultsRef = useRef([]);
   const navigate = useNavigate();
   const { user } = useAuth();
   const canSearchPeople = user && user.role !== "EMPLOYEE";   // employees can't list other people
@@ -53,11 +54,30 @@ export default function CommandPalette({ open, onClose, onOpenEmployee }) {
   };
 
   const onKeyDown = (e) => {
-    if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)); }
-    if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
-    if (e.key === "Enter") { e.preventDefault(); choose(results[active]); }
-    if (e.key === "Escape") onClose();
-  };
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    setActive((a) =>
+      results.length ? (a + 1) % results.length : 0
+    );
+  }
+
+  if (e.key === "ArrowUp") {
+    e.preventDefault();
+    setActive((a) =>
+      results.length ? (a - 1 + results.length) % results.length : 0
+    );
+  }
+
+  if (e.key === "Enter") {
+    e.preventDefault();
+    choose(results[active]);
+  }
+
+  if (e.key === "Escape") {
+    e.preventDefault();
+    onClose();
+  }
+};
 
   return (
     <AnimatePresence>
@@ -74,6 +94,9 @@ export default function CommandPalette({ open, onClose, onOpenEmployee }) {
             <div className="palette-input">
               <Search size={18} />
               <input
+                role="combobox"
+                aria-expanded={results.length > 0}
+                aria-label="Search pages and employees"
                 ref={inputRef}
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setActive(0); }}
