@@ -11,6 +11,8 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import secrets
+
 import bcrypt
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -26,8 +28,10 @@ JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-secret-change-me")
 JWT_ALGORITHM = "HS256"
 TOKEN_HOURS = 8
 
-ADMIN, MANAGER, EMPLOYEE = "ADMIN", "MANAGER", "EMPLOYEE"
-ROLE_NAMES = {1: ADMIN, 2: MANAGER, 3: EMPLOYEE}
+ADMIN, MANAGER, EMPLOYEE, VIEWER = "ADMIN", "MANAGER", "EMPLOYEE", "VIEWER"
+ROLE_NAMES = {1: ADMIN, 2: MANAGER, 3: EMPLOYEE, 4: VIEWER}
+VIEWER_ROLE_ID = 4
+PEOPLE_ROLES = (ADMIN, MANAGER, EMPLOYEE)      # roles that have personal HR records (not viewers)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 bearer = HTTPBearer(auto_error=False)
@@ -182,10 +186,33 @@ def google_login(data: GoogleLoginRequest, db: Session = Depends(get_db)):
 
     email = info["email"].lower()
     user = db.query(User).filter(User.email == email).first()
-    if user is None or user.status != "ACTIVE":
-        raise HTTPException(status_code=403,
-                            detail=f"No active WorkForceIQ account uses {email}. Ask your administrator to add it.")
-    return {"access_token": _create_token(user), "token_type": "bearer", "user": _to_current_user(user, db)}
+    created = False
+
+    if user is None:
+        # First Google sign-in for this email: create a read-only VIEWER account (unless turned off).
+        if os.getenv("GOOGLE_AUTO_SIGNUP", "true").lower() != "true":
+            raise HTTPException(status_code=403,
+                                detail=f"No WorkForceIQ account uses {email}. Ask your administrator to add it.")
+        first = (info.get("given_name") or email.split("@")[0])[:50]
+        last = (info.get("family_name") or "-")[:50]
+        # Google-only account: the stored hash is of a random secret nobody knows, so password login is impossible.
+        unusable = bcrypt.hashpw(secrets.token_bytes(32), bcrypt.gensalt()).decode()
+        user = User(first_name=first, last_name=last, email=email, password_hash=unusable,
+                    role_id=VIEWER_ROLE_ID, status="ACTIVE")
+        db.add(user)
+        try:
+            db.commit()                       # the audit trigger records the new account automatically
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=500,
+                                detail="Couldn't create your viewer account. Ask the administrator to run update_v5.sql.")
+        db.refresh(user)
+        created = True
+    elif user.status != "ACTIVE":
+        raise HTTPException(status_code=403, detail="This account has been deactivated. Contact your administrator.")
+
+    return {"access_token": _create_token(user), "token_type": "bearer",
+            "user": _to_current_user(user, db), "created": created}
 
 
 @router.get("/me", response_model=CurrentUser)

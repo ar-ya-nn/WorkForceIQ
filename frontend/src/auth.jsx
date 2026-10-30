@@ -4,7 +4,7 @@ import { PAGE_KEY } from "./nav.js";
 
 const AuthContext = createContext(null);
 
-export const ROLE_LABEL = { ADMIN: "Admin", MANAGER: "Manager", EMPLOYEE: "Employee" };
+export const ROLE_LABEL = { ADMIN: "Admin", MANAGER: "Manager", EMPLOYEE: "Employee", VIEWER: "Viewer" };
 
 /** Keeps track of who is logged in. The real permission checks happen in the API. */
 export function AuthProvider({ children }) {

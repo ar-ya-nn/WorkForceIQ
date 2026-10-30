@@ -8,15 +8,17 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from backend.app.auth import (ADMIN, MANAGER, CurrentUser, department_scope, ensure_can_view,
+from backend.app.auth import (ADMIN, MANAGER, VIEWER, CurrentUser, department_scope, ensure_can_view,
                               require_roles)
 from backend.app.database import engine, get_db
 from backend.app.explain import build_explanation, short_reason
 from backend.ml.train_model import METRICS_PATH, run_training
 
-# Risk scores are sensitive: admins and managers only. Employees never see predictions.
+# Individual risk scores are sensitive: admins and managers only (each endpoint below says so).
+# Viewers may see group-level results only: /summary, /breakdown, /job-roles and /model-info.
+# Employees never see predictions.
 router = APIRouter(prefix="/predictions", tags=["Attrition Predictions"],
-                   dependencies=[Depends(require_roles(ADMIN, MANAGER))])
+                   dependencies=[Depends(require_roles(ADMIN, MANAGER, VIEWER))])
 
 AGE_BAND = """CASE WHEN {a} < 30 THEN 'Under 30' WHEN {a} < 40 THEN '30-39'
                    WHEN {a} < 50 THEN '40-49' ELSE '50+' END"""
@@ -123,7 +125,7 @@ def breakdown(
     by: Literal[tuple(BREAKDOWNS)] = "gender",
     gender: Optional[Literal["Male", "Female"]] = None,
     db: Session = Depends(get_db),
-    user: CurrentUser = Depends(require_roles(ADMIN, MANAGER)),
+    user: CurrentUser = Depends(require_roles(ADMIN, MANAGER, VIEWER)),
 ):
     """
     Predicted risk for active employees, grouped by one category (e.g. gender),
@@ -174,7 +176,7 @@ def breakdown(
 
 @router.get("/summary")
 def prediction_summary(db: Session = Depends(get_db),
-                       user: CurrentUser = Depends(require_roles(ADMIN, MANAGER))):
+                       user: CurrentUser = Depends(require_roles(ADMIN, MANAGER, VIEWER))):
     """How many employees are in each risk level, overall and per department."""
     where, params = _filters(user)
     overall = db.execute(text(f"""

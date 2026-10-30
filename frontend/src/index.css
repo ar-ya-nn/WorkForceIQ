@@ -760,3 +760,7 @@ select:focus, input:focus, textarea:focus, .search:focus-within, .input-icon:foc
 .brief-list li { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 14px;
   background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.8); font-size: 14.5px; line-height: 1.5; }
 .brief-list li .btn { flex-shrink: 0; }
+
+/* ---------- viewer accounts ---------- */
+.viewer-note { padding: 16px 20px; font-size: 14.5px; line-height: 1.55; }
+.viewer-note strong { color: var(--accent-900); }

@@ -82,7 +82,7 @@ export function useApi(path, params) {
   return { ...state, reload: () => setReloadKey((k) => k + 1) };
 }
 
-export const ROLE_NAMES = { 1: "Admin", 2: "Manager", 3: "Employee" };
+export const ROLE_NAMES = { 1: "Admin", 2: "Manager", 3: "Employee", 4: "Viewer" };
 
 export const fmt = {
   num: (v, d = 0) => (v === null || v === undefined ? "—" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: d, minimumFractionDigits: d })),

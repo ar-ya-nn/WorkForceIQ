@@ -15,7 +15,7 @@ export default function CommandPalette({ open, onClose, onOpenEmployee }) {
   const resultsRef = useRef([]);
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canSearchPeople = user && user.role !== "EMPLOYEE";   // employees can't list other people
+  const canSearchPeople = user && (user.role === "ADMIN" || user.role === "MANAGER");   // only staff can look people up
 
   useEffect(() => {
     if (open) {

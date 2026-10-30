@@ -11,7 +11,7 @@ const TABS = [
   { value: "reviews", label: "Reviews" },
   { value: "model", label: "ML model" },
 ];
-const ROLE_KEY = { 1: "ADMIN", 2: "MANAGER", 3: "EMPLOYEE" };
+const ROLE_KEY = { 1: "ADMIN", 2: "MANAGER", 3: "EMPLOYEE", 4: "VIEWER" };
 const SCALE = [1, 2, 3, 4];
 const SCALE_LABEL = { 1: "1 · Low", 2: "2 · Medium", 3: "3 · High", 4: "4 · Very high" };
 const today = () => new Date().toISOString().slice(0, 10);
@@ -91,7 +91,7 @@ function AccountFields({ form, set, departments, isNew }) {
       {isNew && <Field label="Password (min 8)"><input type="password" value={form.password ?? ""} onChange={set("password")} required /></Field>}
       <Field label="Role">
         <select value={form.role_id ?? 3} onChange={set("role_id")}>
-          <option value={1}>Admin</option><option value={2}>Manager</option><option value={3}>Employee</option>
+          <option value={1}>Admin</option><option value={2}>Manager</option><option value={3}>Employee</option><option value={4}>Viewer (read-only insights)</option>
         </select>
       </Field>
       <Field label="Department">
@@ -264,7 +264,7 @@ function PeopleTab({ notify }) {
         <div className="filter-row">
           <div className="search"><Search size={15} /><input placeholder="Search name or email" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
           <Segmented id="people-role" value={roleId} onChange={(v) => { setRoleId(v); setSkip(0); }}
-            options={[{ value: "", label: "All" }, { value: "1", label: "Admins" }, { value: "2", label: "Managers" }, { value: "3", label: "Employees" }]} />
+            options={[{ value: "", label: "All" }, { value: "1", label: "Admins" }, { value: "2", label: "Managers" }, { value: "3", label: "Employees" }, { value: "4", label: "Viewers" }]} />
           <select value={status} onChange={(e) => { setStatus(e.target.value); setSkip(0); }}>
             <option value="">Any status</option><option value="ACTIVE">Active</option><option value="EXITED">Exited</option>
           </select>

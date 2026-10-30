@@ -193,6 +193,7 @@ const BADGE_TONES = {
   ADMIN: "blue",
   MANAGER: "violet",
   EMPLOYEE: "grey",
+  VIEWER: "grey",
 };
 
 export function Badge({ value, label }) {

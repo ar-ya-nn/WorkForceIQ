@@ -84,7 +84,7 @@ class UserCreate(BaseModel):
     last_name: str = Field(min_length=1, max_length=50)
     email: EmailStr
     password: str = Field(min_length=8)
-    role_id: Literal[1, 2, 3] = 3
+    role_id: Literal[1, 2, 3, 4] = 3
     department_id: Optional[int] = None
     manager_id: Optional[int] = None
     salary: Optional[float] = Field(default=None, gt=0)
@@ -104,7 +104,7 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = Field(default=None, min_length=1, max_length=50)
     last_name: Optional[str] = Field(default=None, min_length=1, max_length=50)
     email: Optional[EmailStr] = None
-    role_id: Optional[Literal[1, 2, 3]] = None
+    role_id: Optional[Literal[1, 2, 3, 4]] = None
     department_id: Optional[int] = None
     manager_id: Optional[int] = None
     salary: Optional[float] = Field(default=None, gt=0)

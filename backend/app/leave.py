@@ -5,7 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from backend.app.auth import (ADMIN, EMPLOYEE, MANAGER, CurrentUser, department_scope,
+from backend.app.auth import (ADMIN, EMPLOYEE, MANAGER, PEOPLE_ROLES, CurrentUser, department_scope,
                               ensure_can_view, get_current_user, require_roles)
 from backend.app.database import db_error_message, get_db
 from backend.app.models import LeaveRequest, LeaveType, User
@@ -61,7 +61,7 @@ def list_leave_requests(
     user_id: Optional[int] = None,
     status: Optional[Literal["PENDING", "APPROVED", "REJECTED"]] = None,
     db: Session = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_roles(*PEOPLE_ROLES)),
 ):
     """Admin: all requests. Manager: their department. Employee: only their own."""
     if user.role == EMPLOYEE:
@@ -86,7 +86,7 @@ def list_leave_requests(
 
 @router.get("/balance/{user_id}")
 def leave_balance(user_id: int, db: Session = Depends(get_db),
-                  user: CurrentUser = Depends(get_current_user)):
+                  user: CurrentUser = Depends(require_roles(*PEOPLE_ROLES))):
     """Days taken / pending / remaining per leave type this year (v_leave_balance)."""
     ensure_can_view(db, user, user_id)
     rows = db.execute(text("SELECT * FROM v_leave_balance WHERE user_id = :id ORDER BY type_name"),
@@ -98,7 +98,7 @@ def leave_balance(user_id: int, db: Session = Depends(get_db),
 
 @router.post("/", response_model=LeaveResponse, status_code=201)
 def apply_for_leave(data: LeaveCreate, db: Session = Depends(get_db),
-                    user: CurrentUser = Depends(get_current_user)):
+                    user: CurrentUser = Depends(require_roles(*PEOPLE_ROLES))):
     """
     Employees can only apply for themselves; managers for themselves or their department;
     admins for anyone. The trg_validate_leave trigger then rejects overlaps or going over the limit.

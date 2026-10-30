@@ -258,7 +258,7 @@ def load_into_db(conn, data):
             RESTART IDENTITY CASCADE
         """)
 
-        cur.execute("INSERT INTO roles (role_id, role_name) VALUES (1,'ADMIN'), (2,'MANAGER'), (3,'EMPLOYEE')")
+        cur.execute("INSERT INTO roles (role_id, role_name) VALUES (1,'ADMIN'), (2,'MANAGER'), (3,'EMPLOYEE'), (4,'VIEWER')")
         execute_values(cur, "INSERT INTO leave_types (type_name, max_days) VALUES %s", LEAVE_TYPES)
 
         dept_ids = {}

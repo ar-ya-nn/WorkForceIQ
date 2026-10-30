@@ -7,6 +7,7 @@ import {
   RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { useApi } from "../api.js";
+import { useAuth } from "../auth.jsx";
 import AnimatedContent from "../components/rb/AnimatedContent.jsx";
 import CountUp from "../components/rb/CountUp.jsx";
 import { Card, ChartGradients, ChartLoading, ErrorBox, Reveal, StatCard } from "../components/ui.jsx";
@@ -164,6 +165,7 @@ function RetentionGauge({ attrition }) {
 }
 
 export default function Overview() {
+  const { user } = useAuth();
   const overview = useApi("/analytics/overview");
   const departments = useApi("/analytics/departments");
   const jobRoles = useApi("/analytics/attrition/job-role");
@@ -190,6 +192,14 @@ export default function Overview() {
 
   return (
     <>
+      {user.role === "VIEWER" && (
+        <Card className="viewer-note">
+          <strong>You're exploring WorkForceIQ as a viewer.</strong>{" "}
+          You can see organisation-wide insights, trends and the attrition model. Information about
+          individual people stays private. For more access, ask an administrator to upgrade your account.
+        </Card>
+      )}
+
       {/* ---------- hero ---------- */}
       <AnimatedContent trigger="mount" distance={20} duration={0.8} className="hero">
         <div className="hero-text">

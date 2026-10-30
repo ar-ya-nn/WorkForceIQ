@@ -52,6 +52,7 @@ function narrative(groups, by) {
 export default function AtRisk() {
   const { user } = useAuth();
   const isAdmin = user.role === "ADMIN";
+  const isViewer = user.role === "VIEWER";   // viewers see group-level comparisons only, never individuals
 
   // ---- compare section
   const [compareBy, setCompareBy] = useState("gender");
@@ -65,8 +66,8 @@ export default function AtRisk() {
   const setFilter = (key, value) => { setFilters((f) => ({ ...f, [key]: value })); setSkip(0); };
 
   const departments = useApi("/departments/");
-  const jobRoles = useApi("/predictions/job-roles");
-  const list = useApi("/predictions/", { ...filters, skip, limit: LIMIT });
+  const jobRoles = useApi(isViewer ? null : "/predictions/job-roles");
+  const list = useApi(isViewer ? null : "/predictions/", { ...filters, skip, limit: LIMIT });
 
   const groups = breakdown.data?.groups ?? [];
   const chartData = groups.map((g) => ({
@@ -78,6 +79,7 @@ export default function AtRisk() {
 
   // clicking a group card applies it as a filter on the list below (where the list supports it)
   const groupFilter = (g) => {
+    if (isViewer) return null;               // no list to filter for viewers
     if (compareBy === "gender") return ["gender", g.grp];
     if (compareBy === "job_role") return ["job_role", g.grp];
     if (compareBy === "age_band") return ["age_band", g.grp];
@@ -190,7 +192,8 @@ export default function AtRisk() {
         </Card>
       </Reveal>
 
-      {/* ---------------- list with filters ---------------- */}
+      {/* ---------------- list with filters (not for viewers) ---------------- */}
+      {!isViewer && (
       <Reveal delay={0.1}>
         <Card title="Employees by risk" subtitle="Click anyone to see why, and what could help.">
           <div className="filter-row" style={{ marginBottom: 14 }}>
@@ -253,8 +256,9 @@ export default function AtRisk() {
           )}
         </Card>
       </Reveal>
+      )}
 
-      <EmployeeDrawer userId={selected} onClose={() => setSelected(null)} />
+      {!isViewer && <EmployeeDrawer userId={selected} onClose={() => setSelected(null)} />}
     </>
   );
 }

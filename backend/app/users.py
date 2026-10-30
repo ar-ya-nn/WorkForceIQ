@@ -6,7 +6,7 @@ from sqlalchemy import or_, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.app.auth import (ADMIN, MANAGER, CurrentUser, department_scope, ensure_can_view,
+from backend.app.auth import (ADMIN, MANAGER, PEOPLE_ROLES, CurrentUser, department_scope, ensure_can_view,
                               get_current_user, require_roles)
 from backend.app.database import db_error_message, get_db
 from backend.app.models import EmployeeProfile, PerformanceReview, User
@@ -59,7 +59,7 @@ def my_details(db: Session = Depends(get_db), user: CurrentUser = Depends(get_cu
 
 @router.get("/{user_id}")
 def get_user_details(user_id: int, db: Session = Depends(get_db),
-                     user: CurrentUser = Depends(get_current_user)):
+                     user: CurrentUser = Depends(require_roles(*PEOPLE_ROLES))):
     """Full employee details (user + department + role + HR profile) from v_employee_details."""
     ensure_can_view(db, user, user_id)
     row = db.execute(text("SELECT * FROM v_employee_details WHERE user_id = :id"),
@@ -71,7 +71,7 @@ def get_user_details(user_id: int, db: Session = Depends(get_db),
 
 @router.get("/{user_id}/reviews", response_model=List[ReviewResponse])
 def get_user_reviews(user_id: int, db: Session = Depends(get_db),
-                     user: CurrentUser = Depends(get_current_user)):
+                     user: CurrentUser = Depends(require_roles(*PEOPLE_ROLES))):
     ensure_can_view(db, user, user_id)
     return (db.query(PerformanceReview)
               .filter(PerformanceReview.user_id == user_id)

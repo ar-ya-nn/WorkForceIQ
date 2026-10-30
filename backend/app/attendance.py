@@ -6,8 +6,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from backend.app.auth import (ADMIN, EMPLOYEE, MANAGER, CurrentUser, department_scope,
-                              ensure_can_view, get_current_user, require_roles)
+from backend.app.auth import (ADMIN, EMPLOYEE, MANAGER, PEOPLE_ROLES, CurrentUser, department_scope,
+                              ensure_can_view, require_roles)
 from backend.app.database import db_error_message, get_db
 from backend.app.models import Attendance, User
 from backend.app.schemas import AttendanceResponse, AttendanceUpsert, Page
@@ -24,7 +24,7 @@ def list_attendance(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     db: Session = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_roles(*PEOPLE_ROLES)),
 ):
     """Admin: everyone. Manager: own department. Employee: only their own records."""
     if user.role == EMPLOYEE:

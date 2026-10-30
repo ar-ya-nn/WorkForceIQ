@@ -12,7 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from backend.app.auth import ADMIN, MANAGER, CurrentUser, require_roles
+from backend.app.auth import ADMIN, MANAGER, VIEWER, CurrentUser, require_roles
 from backend.app.database import get_db
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
@@ -43,7 +43,7 @@ def _rows(db, sql, params=None):
 
 
 @router.get("/briefing")
-def briefing(db: Session = Depends(get_db), user: CurrentUser = Depends(require_roles(ADMIN, MANAGER))):
+def briefing(db: Session = Depends(get_db), user: CurrentUser = Depends(require_roles(ADMIN, MANAGER, VIEWER))):
     o = _rows(db, """
         SELECT COUNT(*) AS total,
                COUNT(*) FILTER (WHERE u.status = 'ACTIVE') AS active,
@@ -145,6 +145,11 @@ def briefing(db: Session = Depends(get_db), user: CurrentUser = Depends(require_
         else:
             todos.append({"text": f"Attendance is steady at about {recent:.0f}%. Nothing unusual there.",
                           "link": "/attendance", "cta": "See attendance"})
+
+    if user.role == VIEWER:
+        # viewers get the organisation-wide picture only: no links into private pages, no operational to-dos
+        focus = [{"text": f["text"].split(" Open the")[0]} for f in focus]
+        todos = []
 
     headline = (
         "Attrition is a real but focused problem." if o["attrition_pct"] and float(o["attrition_pct"]) >= 10

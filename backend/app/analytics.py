@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.app.auth import ADMIN, MANAGER, require_roles
+from backend.app.auth import ADMIN, MANAGER, VIEWER, require_roles
 from backend.app.database import get_db
 
-# Organisation-wide aggregates (no individual data): admins and managers only.
+# Organisation-wide aggregates only (no individual data): admins, managers and viewers.
 router = APIRouter(prefix="/analytics", tags=["Analytics"],
-                   dependencies=[Depends(require_roles(ADMIN, MANAGER))])
+                   dependencies=[Depends(require_roles(ADMIN, MANAGER, VIEWER))])
 
 # Columns allowed for the attrition breakdown. Using a fixed whitelist means the
 # column name never comes straight from the user, so it can't be used for SQL injection.

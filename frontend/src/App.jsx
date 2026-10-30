@@ -76,7 +76,7 @@ function TopBar({ onSearch }) {
     <header className="topbar">
       <button className="search-trigger" onClick={onSearch}>
         <Search size={15} />
-        <span>{user.role === "EMPLOYEE" ? "Go to…" : "Search"}</span>
+        <span>{["ADMIN", "MANAGER"].includes(user.role) ? "Search" : "Go to…"}</span>
         <kbd>{isMac ? <Command size={11} /> : "Ctrl"} K</kbd>
       </button>
       <div className="topbar-right">{today}</div>
