@@ -98,7 +98,7 @@ function GenderCard() {
   );
 }
 
-/** Plain-language briefing written from live data and the ML model (see backend/app/briefing.py). */
+/** Insight briefing: plain-language sentences built by rules from live SQL results and the ML model (backend/app/briefing.py). */
 function Briefing() {
   const b = useApi("/analytics/briefing");
   const navigate = useNavigate();
@@ -115,7 +115,7 @@ function Briefing() {
   return (
     <Card className="briefing">
       <div className="brief-head">
-        <span className="brief-badge"><Sparkles size={14} /> AI briefing</span>
+        <span className="brief-badge"><Sparkles size={14} /> Insight briefing</span>
         <span className="muted small">Updated {new Date(x.generated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
       </div>
       <h2 className="brief-headline">{x.headline}</h2>
@@ -221,7 +221,7 @@ export default function Overview() {
 
       {overview.error && <ErrorBox message={overview.error} />}
 
-      {/* ---------- AI briefing (replaces the number tiles; numbers on request) ---------- */}
+      {/* ---------- Insight briefing (replaces the number tiles; numbers on request) ---------- */}
       <Reveal delay={0.1}>
         <Briefing />
       </Reveal>

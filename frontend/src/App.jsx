@@ -1,7 +1,7 @@
 import { Command, LogOut, Search, ShieldAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
-import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ROLE_LABEL, hasRole, useAuth } from "./auth.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import EmployeeDrawer from "./components/EmployeeDrawer.jsx";
@@ -106,9 +106,37 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [employeeId, setEmployeeId] = useState(null);
 
+  const navigate = useNavigate();
+  const fromBackButton = useRef(false);
+
   // remember the current page for this tab (the address bar itself never changes)
   useEffect(() => {
     sessionStorage.setItem(PAGE_KEY, location.pathname);
+  }, [location.pathname]);
+
+  // Back / Forward buttons: each page visit gets a browser history entry whose URL stays "/",
+  // with the page kept in the entry's state. Pressing Back brings that page back.
+  useEffect(() => {
+    const onPopState = (e) => {
+      const page = e.state?.wfiqPage;
+      if (page) {
+        fromBackButton.current = true;
+        navigate(page);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [navigate]);
+
+  useEffect(() => {
+    if (fromBackButton.current) {            // we got here BY pressing back/forward: don't add another entry
+      fromBackButton.current = false;
+      return;
+    }
+    const current = window.history.state?.wfiqPage;
+    if (current === location.pathname) return;
+    if (current === undefined) window.history.replaceState({ wfiqPage: location.pathname }, "", "/");
+    else window.history.pushState({ wfiqPage: location.pathname }, "", "/");
   }, [location.pathname]);
 
   useEffect(() => {

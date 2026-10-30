@@ -1,5 +1,5 @@
 """
-The Overview "briefing": instead of a wall of numbers, a few plain-English sentences that say
+The Overview "insight briefing": instead of a wall of numbers, a few plain-English sentences that say
 what is happening, what drives it, who to focus on and what needs doing, computed from live
 SQL analytics and the attrition model. Every sentence is built from a query result, so the
 wording always matches the data.
@@ -157,7 +157,7 @@ def briefing(db: Session = Depends(get_db), user: CurrentUser = Depends(require_
         "focus": focus,
         "todos": todos,
         "generated_at": datetime.now().isoformat(timespec="minutes"),
-        "basis": "Written from live database queries and the attrition model. It describes patterns, not causes.",
+        "basis": "Built by rules from live database queries and the attrition model. It describes patterns, not causes.",
     }
 
 
